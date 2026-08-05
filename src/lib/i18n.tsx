@@ -27,6 +27,8 @@ export const t: Dict = {
   themes_open: { en: "Open in Reader", ur: "قاری میں کھولیں" },
   themes_start_playlist: { en: "Play Theme Playlist", ur: "موضوعاتی پلے لسٹ چلائیں" },
   playlist_mode: { en: "Theme Playlist Mode", ur: "موضوعاتی پلے لسٹ موڈ" },
+  hifz_suite: { en: "Hifz Memorization Suite", ur: "حفظ و تحفیظ ٹول" },
+  hifz_toggle: { en: "Hifz Tools", ur: "حفظ ٹولز" },
   themes_verses: { en: "verses", ur: "آیات" },
   themes_search: { en: "Search themes...", ur: "موضوع تلاش کریں..." },
   themes_all_categories: { en: "All Categories", ur: "تمام زمرے" },

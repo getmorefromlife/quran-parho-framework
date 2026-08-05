@@ -20,6 +20,7 @@ import {
   Trash2,
   Users,
   X,
+  BookOpenCheck,
 } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { SURAHS } from "@/lib/surahs";
@@ -71,6 +72,8 @@ import {
 import { FloatingSettings, ReaderSettingsPanel } from "@/components/reader/settings-panel";
 import { CircleTurnBar } from "@/components/reader/circle-turn-bar";
 import { ThemePlaylistBar } from "@/components/reader/theme-playlist-bar";
+import { HifzControls } from "@/components/reader/hifz-controls";
+import { loadHifzPrefs, saveHifzPrefs, type HifzPrefs } from "@/lib/hifz-settings";
 import { createThemePlaylist, type ThemeEntry, type ThemePlaylistItem } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 
@@ -189,6 +192,19 @@ export function SurahReader({
     }
   }, [initialPlaylistTheme]);
 
+  // ── Hifz Memorization Suite State ──
+  const [hifzPrefs, setHifzPrefs] = useState<HifzPrefs>(() => loadHifzPrefs());
+  const [hifzRepeatIndex, setHifzRepeatIndex] = useState(0);
+
+  const updateHifzPrefs = (next: HifzPrefs) => {
+    setHifzPrefs(next);
+    saveHifzPrefs(next);
+    setHifzRepeatIndex(0);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = next.playbackSpeed;
+    }
+  };
+
   // ── Quran Circle Turn Mode State ──
   const [circleTurn, setCircleTurn] = useState(1);
   const chunkSize = prefs.circleChunkSize || 5;
@@ -233,10 +249,11 @@ export function SurahReader({
       setAudioVerse(ayah);
       setAudioError(false);
       el.src = verseAudioUrl(reciter, surahN, ayah);
+      el.playbackRate = hifzPrefs.playbackSpeed;
       el.load();
       el.play().catch(() => setAudioError(true));
     },
-    [reciter, surahN],
+    [reciter, surahN, hifzPrefs.playbackSpeed],
   );
 
   const togglePlay = useCallback(
@@ -288,25 +305,56 @@ export function SurahReader({
   );
 
   const handleAudioEnded = useCallback(() => {
-    if (playlistTheme && playlist.length > 0 && autoAdvanceAudio) {
-      if (playlistTrackIndex < playlist.length - 1) {
-        handleSelectTrack(playlistTrackIndex + 1, true);
-        return;
+    if (audioVerse == null) return;
+
+    // Check Hifz Repeat Loop
+    if (hifzPrefs.enabled && hifzRepeatIndex + 1 < hifzPrefs.verseRepeatCount) {
+      setHifzRepeatIndex((prev) => prev + 1);
+      const delay = hifzPrefs.silenceGapSeconds * 1000;
+      if (delay > 0) {
+        setTimeout(() => {
+          playVerse(audioVerse);
+        }, delay);
+      } else {
+        playVerse(audioVerse);
       }
-      stopAudio();
       return;
     }
 
-    if (!verses || audioVerse == null) return;
-    const idx = verses.findIndex((v) => v.ayah === audioVerse);
-    if (idx === -1) return;
-    const next = verses[idx + 1];
-    if (next && next.ayah >= rangeStart && next.ayah <= rangeEnd) {
-      playVerse(next.ayah);
+    // Reset repeat index for next verse
+    setHifzRepeatIndex(0);
+
+    const advanceNext = () => {
+      if (playlistTheme && playlist.length > 0 && autoAdvanceAudio) {
+        if (playlistTrackIndex < playlist.length - 1) {
+          handleSelectTrack(playlistTrackIndex + 1, true);
+          return;
+        }
+        stopAudio();
+        return;
+      }
+
+      if (!verses) return;
+      const idx = verses.findIndex((v) => v.ayah === audioVerse);
+      if (idx === -1) return;
+      const next = verses[idx + 1];
+      if (next && next.ayah >= rangeStart && next.ayah <= rangeEnd) {
+        playVerse(next.ayah);
+      } else {
+        stopAudio();
+      }
+    };
+
+    if (hifzPrefs.enabled && hifzPrefs.silenceGapSeconds > 0) {
+      setTimeout(advanceNext, hifzPrefs.silenceGapSeconds * 1000);
     } else {
-      stopAudio();
+      advanceNext();
     }
   }, [
+    audioVerse,
+    hifzPrefs,
+    hifzRepeatIndex,
+    playVerse,
     playlistTheme,
     playlist,
     autoAdvanceAudio,
@@ -314,10 +362,8 @@ export function SurahReader({
     handleSelectTrack,
     stopAudio,
     verses,
-    audioVerse,
     rangeStart,
     rangeEnd,
-    playVerse,
   ]);
 
   const handleAudioError = useCallback(() => {
@@ -757,6 +803,20 @@ export function SurahReader({
           </button>
           <button
             type="button"
+            onClick={() => updateHifzPrefs({ ...hifzPrefs, enabled: !hifzPrefs.enabled })}
+            aria-label={tr("hifz_suite")}
+            title={tr("hifz_suite")}
+            className={cn(
+              "relative grid h-9 w-9 shrink-0 place-items-center rounded-full border transition-colors cursor-pointer",
+              hifzPrefs.enabled
+                ? "border-gold/60 bg-gold/10 text-gold"
+                : "border-border bg-card text-muted-foreground hover:text-foreground hover:border-gold/60",
+            )}
+          >
+            <BookOpenCheck className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
             onClick={() => openSavedPanel(savedTab)}
             aria-label="Saved verses"
             className={cn(
@@ -843,6 +903,16 @@ export function SurahReader({
               playVerse(currentTrack.ayah);
             }
           }}
+        />
+      )}
+
+      {/* Hifz Memorization Suite Bar */}
+      {hifzPrefs.enabled && (
+        <HifzControls
+          prefs={hifzPrefs}
+          onChange={updateHifzPrefs}
+          repeatIndex={hifzRepeatIndex}
+          onClose={() => updateHifzPrefs({ ...hifzPrefs, enabled: false })}
         />
       )}
 
@@ -1023,7 +1093,11 @@ export function SurahReader({
                       {showAr && (
                         <p
                           dir="rtl"
-                          className="text-right"
+                          className={cn(
+                            "text-right",
+                            hifzPrefs.selfTestBlur &&
+                              "blur-md hover:blur-none transition-all duration-300 select-none",
+                          )}
                           style={{
                             fontFamily: arFam,
                             fontSize: arSize,
