@@ -160,7 +160,8 @@ export function PresentationMode({
 }: PresentationModeProps) {
   const { lang, tr } = useLang();
 
-  const [fontSizeRem, setFontSizeRem] = useState(3.2);
+  const [arabicFontRem, setArabicFontRem] = useState(3.2);
+  const [transFontRem, setTransFontRem] = useState(1.0);
   const [themeStyle, setThemeStyle] = useState<ThemeStyle>("midnight");
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -282,9 +283,21 @@ export function PresentationMode({
   const singleTrans = activeVerse
     ? renderTrans(
         activeVerse,
-        contentMode === "translation_only" ? { ltr: 1.5, rtl: 1.6 } : { ltr: 1.25, rtl: 1.3 },
+        contentMode === "translation_only"
+          ? { ltr: 2.0 * transFontRem, rtl: 2.2 * transFontRem }
+          : { ltr: 1.25 * transFontRem, rtl: 1.3 * transFontRem },
       )
     : [];
+
+  // Effective translation size (LTR base) for the current view + content mode
+  const transDisplayRem =
+    (viewMode === "turn_block"
+      ? contentMode === "translation_only"
+        ? 0.75
+        : 0.55
+      : contentMode === "translation_only"
+        ? 2.0
+        : 1.25) * transFontRem;
 
   // Fullscreen helper
   const toggleFullscreen = () => {
@@ -645,25 +658,61 @@ export function PresentationMode({
             />
           </div>
 
-          {/* Font Size Scaler */}
-          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl px-2 py-1 gap-1">
-            <Type className="h-3.5 w-3.5 text-zinc-400" />
-            <button
-              onClick={() => setFontSizeRem((s) => Math.max(2.0, s - 0.4))}
-              className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
-              title="Decrease Font Size"
+          {/* Arabic Font Size Scaler */}
+          {contentMode !== "translation_only" && (
+            <div
+              className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl px-2 py-1 gap-1"
+              title={lang === "ur" ? "عربی فونٹ سائز" : "Arabic Font Size"}
             >
-              A-
-            </button>
-            <span className="text-[10px] font-mono text-zinc-500">{fontSizeRem.toFixed(1)}</span>
-            <button
-              onClick={() => setFontSizeRem((s) => Math.min(5.5, s + 0.4))}
-              className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
-              title="Increase Font Size"
+              <Type className="h-3.5 w-3.5 text-amber-400" />
+              <span className="text-[10px] font-bold text-amber-300 uppercase">Ar</span>
+              <button
+                onClick={() => setArabicFontRem((s) => Math.max(2.0, s - 0.4))}
+                className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
+                title="Decrease Arabic Font Size"
+              >
+                A-
+              </button>
+              <span className="text-[10px] font-mono text-zinc-500">
+                {arabicFontRem.toFixed(1)}
+              </span>
+              <button
+                onClick={() => setArabicFontRem((s) => Math.min(6.0, s + 0.4))}
+                className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
+                title="Increase Arabic Font Size"
+              >
+                A+
+              </button>
+            </div>
+          )}
+
+          {/* Translation Font Size Scaler */}
+          {contentMode !== "arabic_only" && (
+            <div
+              className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl px-2 py-1 gap-1"
+              title={lang === "ur" ? "ترجمہ فونٹ سائز" : "Translation Font Size"}
             >
-              A+
-            </button>
-          </div>
+              <BookOpenText className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="text-[10px] font-bold text-emerald-300 uppercase">Tr</span>
+              <button
+                onClick={() => setTransFontRem((s) => Math.max(0.6, s - 0.2))}
+                className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
+                title="Decrease Translation Font Size"
+              >
+                A-
+              </button>
+              <span className="text-[10px] font-mono text-zinc-500">
+                {transDisplayRem.toFixed(1)}
+              </span>
+              <button
+                onClick={() => setTransFontRem((s) => Math.min(2.6, s + 0.2))}
+                className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
+                title="Increase Translation Font Size"
+              >
+                A+
+              </button>
+            </div>
+          )}
 
           {/* View Mode Switcher: 5-Verse Turn Block vs Single Verse */}
           <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
@@ -830,8 +879,8 @@ export function PresentationMode({
                   const trans = renderTrans(
                     v,
                     contentMode === "translation_only"
-                      ? { ltr: 0.75, rtl: 0.85 }
-                      : { ltr: 0.55, rtl: 0.65 },
+                      ? { ltr: 0.75 * transFontRem, rtl: 0.85 * transFontRem }
+                      : { ltr: 0.55 * transFontRem, rtl: 0.65 * transFontRem },
                   );
                   return (
                     <div
@@ -882,7 +931,7 @@ export function PresentationMode({
                         </div>
                       ) : contentMode === "arabic_only" ? (
                         /* Arabic-Only Calligraphy Mode */
-                        renderArabic(v, fontSizeRem * 0.9)
+                        renderArabic(v, arabicFontRem * 0.9)
                       ) : layoutWidth === "wide" ? (
                         /* Both (Wide 2-Column Layout): Left = Translations | Right = Arabic */
                         <div className="grid md:grid-cols-12 gap-6 items-center">
@@ -907,7 +956,7 @@ export function PresentationMode({
 
                           {/* Right Side (Cols 7 to 12): Arabic Calligraphy & Ayah Number */}
                           <div className="md:col-span-6 order-1 md:order-2">
-                            {renderArabic(v, fontSizeRem * 0.85)}
+                            {renderArabic(v, arabicFontRem * 0.85)}
                           </div>
                         </div>
                       ) : (
@@ -916,7 +965,7 @@ export function PresentationMode({
                           dir={stageDir}
                           className={cn("space-y-3", allRtl ? "text-right" : "text-left")}
                         >
-                          {renderArabic(v, fontSizeRem * 0.85)}
+                          {renderArabic(v, arabicFontRem * 0.85)}
 
                           {trans.length ? (
                             trans
@@ -985,7 +1034,7 @@ export function PresentationMode({
 
               {contentMode === "arabic_only" ? (
                 /* Ultra-Large Arabic Text with Ayah Number */
-                activeVerse && renderArabic(activeVerse, fontSizeRem)
+                activeVerse && renderArabic(activeVerse, arabicFontRem * 1.25)
               ) : contentMode === "translation_only" ? (
                 /* Translation-Only Focus Mode */
                 activeVerse && (
@@ -1007,7 +1056,7 @@ export function PresentationMode({
               ) : (
                 <>
                   {/* Ultra-Large Arabic Text with Ayah Number */}
-                  {activeVerse && renderArabic(activeVerse, fontSizeRem)}
+                  {activeVerse && renderArabic(activeVerse, arabicFontRem)}
 
                   {/* Translations */}
                   {activeVerse && (
