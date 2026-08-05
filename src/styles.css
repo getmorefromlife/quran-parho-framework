@@ -1,0 +1,167 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-emerald-deep: var(--emerald-deep);
+  --font-serif-display: "Cinzel", "Playfair Display", serif;
+  --font-sans: "Plus Jakarta Sans", "Inter", sans-serif;
+  --font-urdu: "Gulzar", "Noto Nastaliq Urdu", "Noto Naskh Arabic", serif;
+  --font-arabic: "KFGQPC Uthman Taha Naskh", "Amiri Quran", "Scheherazade New", "Noto Naskh Arabic", serif;
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.985 0.008 85);
+  --foreground: oklch(0.22 0.03 250);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.03 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.03 250);
+  --primary: oklch(0.36 0.09 160);
+  --primary-foreground: oklch(0.985 0.008 85);
+  --secondary: oklch(0.95 0.02 85);
+  --secondary-foreground: oklch(0.22 0.03 250);
+  --muted: oklch(0.95 0.015 85);
+  --muted-foreground: oklch(0.5 0.02 250);
+  --accent: oklch(0.75 0.13 85);
+  --accent-foreground: oklch(0.22 0.03 250);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0.008 85);
+  --border: oklch(0.9 0.02 85);
+  --input: oklch(0.92 0.015 85);
+  --ring: oklch(0.75 0.13 85);
+  --gold: oklch(0.75 0.13 85);
+  --gold-soft: oklch(0.85 0.09 85);
+  --emerald-deep: oklch(0.36 0.09 160);
+  --gradient-hero: radial-gradient(ellipse at top, oklch(0.92 0.06 85 / 0.6), transparent 60%), linear-gradient(180deg, oklch(0.985 0.008 85), oklch(0.96 0.015 85));
+  --gradient-emerald: linear-gradient(135deg, oklch(0.36 0.09 160), oklch(0.28 0.07 160));
+  --gradient-gold: linear-gradient(135deg, oklch(0.82 0.13 85), oklch(0.68 0.13 75));
+  --shadow-elegant: 0 20px 60px -20px oklch(0.36 0.09 160 / 0.25);
+  --shadow-gold: 0 10px 40px -10px oklch(0.75 0.13 85 / 0.5);
+}
+
+.dark {
+  --background: oklch(0.18 0.02 250);
+  --foreground: oklch(0.96 0.01 85);
+  --card: oklch(0.22 0.025 250);
+  --card-foreground: oklch(0.96 0.01 85);
+  --popover: oklch(0.22 0.025 250);
+  --popover-foreground: oklch(0.96 0.01 85);
+  --primary: oklch(0.55 0.11 160);
+  --primary-foreground: oklch(0.15 0.02 250);
+  --secondary: oklch(0.28 0.03 250);
+  --secondary-foreground: oklch(0.96 0.01 85);
+  --muted: oklch(0.28 0.03 250);
+  --muted-foreground: oklch(0.72 0.02 85);
+  --accent: oklch(0.78 0.14 85);
+  --accent-foreground: oklch(0.18 0.02 250);
+  --destructive: oklch(0.6 0.2 27);
+  --destructive-foreground: oklch(0.96 0.01 85);
+  --border: oklch(0.32 0.03 250);
+  --input: oklch(0.28 0.03 250);
+  --ring: oklch(0.78 0.14 85);
+  --gold: oklch(0.82 0.14 85);
+  --gold-soft: oklch(0.7 0.11 85);
+  --emerald-deep: oklch(0.55 0.11 160);
+  --gradient-hero: radial-gradient(ellipse at top, oklch(0.4 0.09 160 / 0.4), transparent 60%), linear-gradient(180deg, oklch(0.18 0.02 250), oklch(0.14 0.02 250));
+  --shadow-elegant: 0 20px 60px -20px oklch(0 0 0 / 0.6);
+  --shadow-gold: 0 10px 40px -10px oklch(0.82 0.14 85 / 0.4);
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+  }
+  html[dir="rtl"] body,
+  .urdu {
+    font-family: var(--font-urdu);
+  }
+  h1, h2, h3, .display {
+    font-family: var(--font-serif-display);
+    letter-spacing: -0.01em;
+  }
+  html[dir="rtl"] h1, html[dir="rtl"] h2, html[dir="rtl"] h3, html[dir="rtl"] .display {
+    font-family: var(--font-urdu);
+    letter-spacing: 0;
+  }
+}
+
+@utility bg-hero { background: var(--gradient-hero); }
+@utility bg-emerald-gradient { background: var(--gradient-emerald); }
+@utility bg-gold-gradient { background: var(--gradient-gold); }
+@utility shadow-elegant { box-shadow: var(--shadow-elegant); }
+@utility shadow-gold { box-shadow: var(--shadow-gold); }
+@utility text-gold { color: var(--gold); }
+@utility border-gold { border-color: var(--gold); }
+@utility bg-gold { background-color: var(--gold); }
+@utility ring-gold { --tw-ring-color: var(--gold); }
+
+@keyframes float-particle {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0.6; }
+  50% { transform: translateY(-20px) translateX(10px); opacity: 1; }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px oklch(0.75 0.13 85 / 0.4); }
+  50% { box-shadow: 0 0 40px oklch(0.75 0.13 85 / 0.7); }
+}
+
+@font-face {
+  font-family: "KFGQPC Uthman Taha Naskh";
+  src: url("/fonts/KFGQPC Uthman Taha Naskh Regular.ttf") format("truetype");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Al Qalam Quran Majeed Web";
+  src: url("/fonts/Al Qalam Quran Majeed Web Regular.ttf") format("truetype");
+  font-display: swap;
+}
+@font-face {
+  font-family: "Me Quran Volt Newmet";
+  src: url("/fonts/me_quran_volt_newmet.ttf") format("truetype");
+  font-display: swap;
+}
+
+.particle { animation: float-particle 6s ease-in-out infinite; }
+.glow-pulse { animation: glow-pulse 3s ease-in-out infinite; }
+.shimmer-gold {
+  background: linear-gradient(90deg, transparent, oklch(0.85 0.14 85 / 0.4), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+}
