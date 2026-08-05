@@ -72,6 +72,7 @@ const THEMES: Record<
     urduText: string;
     border: string;
     cardBg: string;
+    boxBg: string;
     badgeBg: string;
     badgeText: string;
     isLight: boolean;
@@ -85,6 +86,7 @@ const THEMES: Record<
     urduText: "text-[#78350f] font-bold",
     border: "border-slate-300",
     cardBg: "bg-white shadow-lg border-slate-300",
+    boxBg: "bg-slate-100/90 border-slate-300",
     badgeBg: "bg-amber-100 border-amber-400",
     badgeText: "text-amber-900",
     isLight: true,
@@ -97,6 +99,7 @@ const THEMES: Record<
     urduText: "text-[#451a03] font-bold",
     border: "border-[#d6c4a5]",
     cardBg: "bg-[#f4ebd9] shadow-lg border-[#d6c4a5]",
+    boxBg: "bg-[#f1e6cd] border-[#c4af89]",
     badgeBg: "bg-[#e8d7b8] border-[#c4af89]",
     badgeText: "text-[#451a03]",
     isLight: true,
@@ -109,6 +112,7 @@ const THEMES: Record<
     urduText: "text-amber-200 font-normal",
     border: "border-emerald-800/80",
     cardBg: "bg-[#0a291e]/90 shadow-lg border-emerald-800/80",
+    boxBg: "bg-emerald-950/70 border-emerald-800/80",
     badgeBg: "bg-emerald-900/60 border-amber-400/40",
     badgeText: "text-amber-300",
     isLight: false,
@@ -121,6 +125,7 @@ const THEMES: Record<
     urduText: "text-amber-200 font-normal",
     border: "border-slate-800",
     cardBg: "bg-[#131f3d]/90 shadow-lg border-slate-700/80",
+    boxBg: "bg-[#0d1830]/90 border-slate-700/80",
     badgeBg: "bg-slate-900/80 border-amber-400/40",
     badgeText: "text-amber-400",
     isLight: false,
@@ -133,6 +138,7 @@ const THEMES: Record<
     urduText: "text-yellow-200 font-normal",
     border: "border-zinc-800",
     cardBg: "bg-zinc-900/90 shadow-lg border-zinc-800",
+    boxBg: "bg-zinc-950 border-zinc-800",
     badgeBg: "bg-zinc-900 border-yellow-400/40",
     badgeText: "text-yellow-400",
     isLight: false,
@@ -212,7 +218,11 @@ export function PresentationMode({
 
   // Render the active selected translations for a verse, each with its own
   // inline ayah number at the language's reading-direction anchor
-  const renderTrans = (v: QVerse, size: { ltr: number; rtl: number }): ReactNode[] => {
+  const renderTrans = (
+    v: QVerse,
+    size: { ltr: number; rtl: number },
+    boxed?: boolean,
+  ): ReactNode[] => {
     return activeTransDefs.flatMap((tDef) => {
       const text = getTranslationText(v as unknown as Record<string, unknown>, tDef.id);
       if (!text) return [];
@@ -229,6 +239,39 @@ export function PresentationMode({
           {v.ayah}
         </span>
       );
+      const content = (
+        <>
+          {isRTL ? (
+            <>
+              <span className="flex-1">"{text}"</span>
+              {num}
+            </>
+          ) : (
+            <>
+              {num}
+              <span className="flex-1">"{text}"</span>
+            </>
+          )}
+        </>
+      );
+      if (boxed) {
+        return [
+          <div key={tDef.id} className={cn("rounded-2xl border px-4 py-3.5", currentTheme.boxBg)}>
+            <p
+              dir={tDef.dir}
+              className={cn(
+                "leading-relaxed transition-all flex items-baseline gap-2",
+                isRTL
+                  ? cn("font-arabic text-right justify-end", currentTheme.urduText)
+                  : cn("font-serif text-left", currentTheme.transText),
+              )}
+              style={{ fontSize: `${isRTL ? size.rtl : size.ltr}rem` }}
+            >
+              {content}
+            </p>
+          </div>,
+        ];
+      }
       return [
         <p
           key={tDef.id}
@@ -241,17 +284,7 @@ export function PresentationMode({
           )}
           style={{ fontSize: `${isRTL ? size.rtl : size.ltr}rem` }}
         >
-          {isRTL ? (
-            <>
-              <span className="flex-1">"{text}"</span>
-              {num}
-            </>
-          ) : (
-            <>
-              {num}
-              <span className="flex-1">"{text}"</span>
-            </>
-          )}
+          {content}
         </p>,
       ];
     });
@@ -881,6 +914,7 @@ export function PresentationMode({
                     contentMode === "translation_only"
                       ? { ltr: 0.75 * transFontRem, rtl: 0.85 * transFontRem }
                       : { ltr: 0.55 * transFontRem, rtl: 0.65 * transFontRem },
+                    true,
                   );
                   return (
                     <div
@@ -916,10 +950,7 @@ export function PresentationMode({
                           {trans.length ? (
                             <div
                               dir={stageDir}
-                              className={cn(
-                                "grid gap-4 lg:grid-cols-2 xl:grid-cols-3",
-                                allRtl ? "text-right" : "text-left",
-                              )}
+                              className={cn("space-y-3", allRtl ? "text-right" : "text-left")}
                             >
                               {trans}
                             </div>
