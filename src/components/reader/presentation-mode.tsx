@@ -48,52 +48,84 @@ export type PresentationModeProps = {
   turnStartAyah?: number;
   turnEndAyah?: number;
   prefs?: ReaderPrefs;
+  selectedTrans?: string[];
 };
 
 type ThemeStyle = "light" | "parchment" | "emerald" | "midnight" | "oled";
 
 const THEMES: Record<
   ThemeStyle,
-  { bg: string; text: string; gold: string; border: string; cardBg: string; isLight: boolean }
+  {
+    bg: string;
+    text: string;
+    gold: string;
+    transText: string;
+    urduText: string;
+    border: string;
+    cardBg: string;
+    badgeBg: string;
+    badgeText: string;
+    isLight: boolean;
+  }
 > = {
   light: {
-    bg: "bg-slate-100",
+    bg: "bg-[#f8fafc]",
     text: "text-slate-900",
-    gold: "text-amber-800",
+    gold: "text-amber-900 font-bold",
+    transText: "text-slate-900 font-medium",
+    urduText: "text-[#78350f] font-bold",
     border: "border-slate-300",
-    cardBg: "bg-white/90",
+    cardBg: "bg-white shadow-lg border-slate-300",
+    badgeBg: "bg-amber-100 border-amber-400",
+    badgeText: "text-amber-900",
     isLight: true,
   },
   parchment: {
-    bg: "bg-[#f5efdf]",
-    text: "text-[#2a2118]",
-    gold: "text-amber-900",
-    border: "border-[#dfd3b9]",
-    cardBg: "bg-[#ebdcb9]/80",
+    bg: "bg-[#fbf7ee]",
+    text: "text-[#1c130e]",
+    gold: "text-[#78350f] font-bold",
+    transText: "text-[#2c1d11] font-medium",
+    urduText: "text-[#451a03] font-bold",
+    border: "border-[#d6c4a5]",
+    cardBg: "bg-[#f4ebd9] shadow-lg border-[#d6c4a5]",
+    badgeBg: "bg-[#e8d7b8] border-[#c4af89]",
+    badgeText: "text-[#451a03]",
     isLight: true,
   },
   emerald: {
-    bg: "bg-emerald-950",
+    bg: "bg-[#041a12]",
     text: "text-emerald-50",
-    gold: "text-amber-400",
-    border: "border-emerald-800/60",
-    cardBg: "bg-zinc-900/60",
+    gold: "text-amber-300 font-bold",
+    transText: "text-zinc-100 font-normal",
+    urduText: "text-amber-200 font-normal",
+    border: "border-emerald-800/80",
+    cardBg: "bg-[#0a291e]/90 shadow-lg border-emerald-800/80",
+    badgeBg: "bg-emerald-900/60 border-amber-400/40",
+    badgeText: "text-amber-300",
     isLight: false,
   },
   midnight: {
-    bg: "bg-slate-950",
+    bg: "bg-[#0b1329]",
     text: "text-slate-100",
-    gold: "text-gold",
-    border: "border-slate-800/60",
-    cardBg: "bg-zinc-900/60",
+    gold: "text-amber-400 font-bold",
+    transText: "text-zinc-100 font-normal",
+    urduText: "text-amber-200 font-normal",
+    border: "border-slate-800",
+    cardBg: "bg-[#131f3d]/90 shadow-lg border-slate-700/80",
+    badgeBg: "bg-slate-900/80 border-amber-400/40",
+    badgeText: "text-amber-400",
     isLight: false,
   },
   oled: {
     bg: "bg-black",
     text: "text-white",
-    gold: "text-yellow-400",
+    gold: "text-yellow-400 font-bold",
+    transText: "text-zinc-100 font-normal",
+    urduText: "text-yellow-200 font-normal",
     border: "border-zinc-800",
-    cardBg: "bg-zinc-900/80",
+    cardBg: "bg-zinc-900/90 shadow-lg border-zinc-800",
+    badgeBg: "bg-zinc-900 border-yellow-400/40",
+    badgeText: "text-yellow-400",
     isLight: false,
   },
 };
@@ -115,12 +147,19 @@ export function PresentationMode({
   turnStartAyah,
   turnEndAyah,
   prefs,
+  selectedTrans,
 }: PresentationModeProps) {
   const { lang } = useLang();
 
   const [fontSizeRem, setFontSizeRem] = useState(3.2);
   const [themeStyle, setThemeStyle] = useState<ThemeStyle>("midnight");
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Translation visibility filters from reader settings
+  const showEnglish =
+    !selectedTrans || selectedTrans.length === 0 || selectedTrans.includes("english_qarai");
+  const showUrdu =
+    !selectedTrans || selectedTrans.length === 0 || selectedTrans.includes("urdu_jawadi");
   const [showPrompts, setShowPrompts] = useState(false);
 
   // Content Display Mode: both (Arabic+Translation) | translation_only | arabic_only
@@ -610,32 +649,52 @@ export function PresentationMode({
                   <div
                     key={v.ayah}
                     className={cn(
-                      "p-4 sm:p-5 rounded-2xl border transition-all",
+                      "p-5 sm:p-6 rounded-2xl border transition-all",
                       currentTheme.border,
                       currentTheme.cardBg,
-                      "backdrop-blur-sm shadow-md",
                     )}
                   >
                     {contentMode === "translation_only" ? (
-                      /* Translation-Only Focus Mode */
-                      <div className="space-y-3 text-left">
+                      /* Translation-Only Focus Mode — Respects Reader Settings Selection */
+                      <div className="space-y-4 text-left">
                         <div className="flex items-center gap-2">
-                          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-400/40 bg-zinc-950 text-sm font-bold text-amber-400">
+                          <span
+                            className={cn(
+                              "inline-flex h-8 w-8 items-center justify-center rounded-full border text-sm font-bold shadow-sm",
+                              currentTheme.badgeBg,
+                              currentTheme.badgeText,
+                            )}
+                          >
                             {v.ayah}
                           </span>
-                          <span className="text-[10px] uppercase font-bold text-amber-500/80 tracking-wider">
-                            {lang === "ur" ? "ترجمہ فہم موڈ" : "Translation Focus"}
+                          <span
+                            className={cn(
+                              "text-xs uppercase font-bold tracking-wider",
+                              currentTheme.gold,
+                            )}
+                          >
+                            {lang === "ur" ? "ترجمہ فہم موڈ" : "Translation Focus Mode"}
                           </span>
                         </div>
-                        {v.english_qarai && (
-                          <p className="text-lg sm:text-xl lg:text-2xl font-serif leading-relaxed text-zinc-100">
+                        {showEnglish && v.english_qarai && (
+                          <p
+                            className={cn(
+                              "font-serif leading-relaxed transition-all",
+                              currentTheme.transText,
+                            )}
+                            style={{ fontSize: `${fontSizeRem * 0.75}rem` }}
+                          >
                             "{v.english_qarai}"
                           </p>
                         )}
-                        {v.urdu_jawadi && (
+                        {showUrdu && v.urdu_jawadi && (
                           <p
                             dir="rtl"
-                            className="text-lg sm:text-xl lg:text-2xl font-arabic leading-relaxed text-amber-200/95 text-right pt-1"
+                            className={cn(
+                              "font-arabic leading-relaxed text-right pt-1 transition-all",
+                              currentTheme.urduText,
+                            )}
+                            style={{ fontSize: `${fontSizeRem * 0.85}rem` }}
                           >
                             "{v.urdu_jawadi}"
                           </p>
@@ -644,7 +703,13 @@ export function PresentationMode({
                     ) : contentMode === "arabic_only" ? (
                       /* Arabic-Only Calligraphy Mode */
                       <div className="flex items-start justify-between gap-4">
-                        <span className="inline-flex align-middle h-8 w-8 items-center justify-center rounded-full border border-amber-400/40 bg-zinc-950 text-sm font-bold text-amber-400 shrink-0">
+                        <span
+                          className={cn(
+                            "inline-flex align-middle h-8 w-8 items-center justify-center rounded-full border text-sm font-bold shrink-0",
+                            currentTheme.badgeBg,
+                            currentTheme.badgeText,
+                          )}
+                        >
                           {v.ayah}
                         </span>
                         <p
@@ -663,15 +728,22 @@ export function PresentationMode({
                       <div className="grid md:grid-cols-12 gap-6 items-center">
                         {/* Left Side (Cols 1 to 6): English & Urdu Translations */}
                         <div className="md:col-span-6 space-y-2 text-left order-2 md:order-1">
-                          {v.english_qarai && (
-                            <p className="text-base sm:text-lg lg:text-xl font-serif text-zinc-200 leading-relaxed">
+                          {showEnglish && v.english_qarai && (
+                            <p
+                              className={cn("font-serif leading-relaxed", currentTheme.transText)}
+                              style={{ fontSize: `${fontSizeRem * 0.55}rem` }}
+                            >
                               "{v.english_qarai}"
                             </p>
                           )}
-                          {v.urdu_jawadi && (
+                          {showUrdu && v.urdu_jawadi && (
                             <p
                               dir="rtl"
-                              className="text-base sm:text-lg lg:text-xl font-arabic text-amber-200/90 leading-relaxed text-right"
+                              className={cn(
+                                "font-arabic leading-relaxed text-right",
+                                currentTheme.urduText,
+                              )}
+                              style={{ fontSize: `${fontSizeRem * 0.65}rem` }}
                             >
                               "{v.urdu_jawadi}"
                             </p>
@@ -690,7 +762,13 @@ export function PresentationMode({
                           >
                             {v.arabic}
                           </p>
-                          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-amber-400/40 bg-zinc-950 text-sm font-bold text-amber-400 shrink-0">
+                          <span
+                            className={cn(
+                              "inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold shrink-0",
+                              currentTheme.badgeBg,
+                              currentTheme.badgeText,
+                            )}
+                          >
                             {v.ayah}
                           </span>
                         </div>
@@ -699,7 +777,13 @@ export function PresentationMode({
                       /* Both (Standard Stacked Layout) */
                       <div className="space-y-3">
                         <div className="flex items-start justify-between gap-4">
-                          <span className="inline-flex align-middle h-8 w-8 items-center justify-center rounded-full border border-amber-400/40 bg-zinc-950 text-sm font-bold text-amber-400 shrink-0">
+                          <span
+                            className={cn(
+                              "inline-flex align-middle h-8 w-8 items-center justify-center rounded-full border text-sm font-bold shrink-0",
+                              currentTheme.badgeBg,
+                              currentTheme.badgeText,
+                            )}
+                          >
                             {v.ayah}
                           </span>
                           <p
@@ -714,15 +798,25 @@ export function PresentationMode({
                           </p>
                         </div>
 
-                        {v.english_qarai && (
-                          <p className="text-lg sm:text-xl font-serif text-zinc-200 leading-relaxed pl-12">
+                        {showEnglish && v.english_qarai && (
+                          <p
+                            className={cn(
+                              "font-serif leading-relaxed pl-12",
+                              currentTheme.transText,
+                            )}
+                            style={{ fontSize: `${fontSizeRem * 0.55}rem` }}
+                          >
                             "{v.english_qarai}"
                           </p>
                         )}
-                        {v.urdu_jawadi && (
+                        {showUrdu && v.urdu_jawadi && (
                           <p
                             dir="rtl"
-                            className="text-lg sm:text-xl font-arabic text-amber-200/90 leading-relaxed text-right pr-2"
+                            className={cn(
+                              "font-arabic leading-relaxed text-right pr-2",
+                              currentTheme.urduText,
+                            )}
+                            style={{ fontSize: `${fontSizeRem * 0.65}rem` }}
                           >
                             "{v.urdu_jawadi}"
                           </p>
