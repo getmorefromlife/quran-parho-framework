@@ -335,7 +335,6 @@ export function FloatingSettings({ open, onOpenChange, children }: FloatingSetti
     startY: number;
     moved: boolean;
   } | null>(null);
-  const hoverTimer = useRef<number | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   const persist = useCallback((p: { x: number; y: number }) => {
@@ -374,19 +373,6 @@ export function FloatingSettings({ open, onOpenChange, children }: FloatingSetti
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-
-  useEffect(() => {
-    return () => {
-      if (hoverTimer.current !== null) window.clearTimeout(hoverTimer.current);
-    };
-  }, []);
-
-  const scheduleHover = (next: boolean) => {
-    if (hoverTimer.current !== null) window.clearTimeout(hoverTimer.current);
-    hoverTimer.current = window.setTimeout(() => {
-      if (!dragRef.current) onOpenChange(next);
-    }, 160);
-  };
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
@@ -427,13 +413,7 @@ export function FloatingSettings({ open, onOpenChange, children }: FloatingSetti
       {open && (
         <div className="fixed inset-0 z-[96]" onClick={() => onOpenChange(false)} aria-hidden />
       )}
-      <div
-        ref={wrapperRef}
-        className="fixed z-[97]"
-        style={{ left: pos.x, top: pos.y }}
-        onMouseEnter={() => scheduleHover(true)}
-        onMouseLeave={() => scheduleHover(false)}
-      >
+      <div ref={wrapperRef} className="fixed z-[97]" style={{ left: pos.x, top: pos.y }}>
         <div
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}

@@ -33,7 +33,7 @@ import { SurahExplorer } from "@/components/surah-explorer";
 import { ShareSurah } from "@/components/share-surah";
 import { FacilitatorTools } from "@/components/facilitator-tools";
 import { ThematicLibrary } from "@/components/sections/thematic-library";
-import type { ThemeEntry } from "@/lib/themes";
+import { getOrCreateThemeProject, parseVerseSpecs, type ThemeEntry } from "@/lib/themes";
 
 const SurahReader = lazy(() =>
   import("@/components/reader").then((m) => ({ default: m.SurahReader })),
@@ -77,6 +77,8 @@ function Page() {
     surahN: number;
     rangeStart: number;
     rangeEnd: number;
+    initialShowSavedPanel?: boolean;
+    initialSavedTab?: "notes" | "highlights" | "favorites" | "searches";
   } | null>(null);
   const [readerVerses, setReaderVerses] = useState<QVerse[] | null>(null);
   const [readerError, setReaderError] = useState(false);
@@ -95,7 +97,18 @@ function Page() {
     n: number,
     rangeStart = 1,
     rangeEnd = SURAHS.find((s) => s.n === n)?.verses ?? 114,
-  ) => setReaderOpen({ surahN: n, rangeStart, rangeEnd });
+    options?: {
+      initialShowSavedPanel?: boolean;
+      initialSavedTab?: "notes" | "highlights" | "favorites" | "searches";
+    },
+  ) =>
+    setReaderOpen({
+      surahN: n,
+      rangeStart,
+      rangeEnd,
+      initialShowSavedPanel: options?.initialShowSavedPanel,
+      initialSavedTab: options?.initialSavedTab,
+    });
 
   const [jumpToVerse, setJumpToVerse] = useState<number | undefined>(undefined);
   const readerNavigate = (n: number, jumpTo?: number) => {
@@ -104,13 +117,15 @@ function Page() {
   };
 
   const handleOpenTheme = (theme: ThemeEntry) => {
-    if (theme.verses.length > 0) {
-      const firstVerse = theme.verses[0];
-      const [surahStr, verseStr] = firstVerse.split(":");
-      const surahN = parseInt(surahStr, 10);
-      const ayahN = verseStr ? parseInt(verseStr.split("-")[0], 10) : 1;
-      openReader(surahN);
-      setJumpToVerse(ayahN);
+    getOrCreateThemeProject(theme, lang as "en" | "ur");
+    const parsed = parseVerseSpecs(theme.verses);
+    if (parsed.length > 0) {
+      const first = parsed[0];
+      openReader(first.surah, 1, undefined, {
+        initialShowSavedPanel: true,
+        initialSavedTab: "favorites",
+      });
+      setJumpToVerse(first.ayah);
     }
   };
 
@@ -204,6 +219,8 @@ function Page() {
             selectedTranslations={loadSelectedTranslations()}
             rangeStart={readerOpen.rangeStart}
             rangeEnd={readerOpen.rangeEnd}
+            initialShowSavedPanel={readerOpen.initialShowSavedPanel}
+            initialSavedTab={readerOpen.initialSavedTab}
             onClose={() => setReaderOpen(null)}
             onNavigate={readerNavigate}
             jumpToVerse={jumpToVerse}

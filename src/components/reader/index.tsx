@@ -85,6 +85,8 @@ export type SurahReaderProps = {
   onNavigate: (n: number, jumpTo?: number) => void;
   jumpToVerse?: number;
   onJumpComplete?: () => void;
+  initialShowSavedPanel?: boolean;
+  initialSavedTab?: "notes" | "highlights" | "favorites" | "searches";
 };
 
 export function SurahReader({
@@ -100,6 +102,8 @@ export function SurahReader({
   onNavigate,
   jumpToVerse,
   onJumpComplete,
+  initialShowSavedPanel,
+  initialSavedTab,
 }: SurahReaderProps) {
   const { tr, lang } = useLang();
   const [prefs, setPrefs] = useState<ReaderPrefs>(() => loadReaderPrefs());
@@ -145,13 +149,23 @@ export function SurahReader({
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchSavedToast, setSearchSavedToast] = useState(false);
   const allSurahCache = useRef<Map<number, QVerse[]>>(new Map());
-  const [showSavedPanel, setShowSavedPanel] = useState(false);
+  const [showSavedPanel, setShowSavedPanel] = useState(() => initialShowSavedPanel ?? false);
   const [savedTab, setSavedTab] = useState<"notes" | "highlights" | "favorites" | "searches">(
-    "notes",
+    () => initialSavedTab ?? "notes",
   );
-  const [notesListTab, setNotesListTab] = useState<"surah" | "all">("surah");
+  const [notesListTab, setNotesListTab] = useState<"surah" | "all">(() =>
+    initialShowSavedPanel && initialSavedTab === "favorites" ? "all" : "surah",
+  );
   const [savedText, setSavedText] = useState<Record<number, QVerse[]>>({});
   const [savedLoading, setSavedLoading] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    if (initialShowSavedPanel) {
+      setShowSavedPanel(true);
+      if (initialSavedTab) setSavedTab(initialSavedTab);
+      if (initialSavedTab === "favorites") setNotesListTab("all");
+    }
+  }, [initialShowSavedPanel, initialSavedTab]);
 
   // ── Quran Circle Turn Mode State ──
   const [circleTurn, setCircleTurn] = useState(1);

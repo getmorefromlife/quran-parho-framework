@@ -1,4 +1,10 @@
 import rawThemes from "@/data/themes.json";
+import {
+  loadProjects,
+  saveProjects,
+  saveActiveProjectId,
+  type ResearchProject,
+} from "@/lib/verse-collections";
 
 export type Tradition = "shared" | "sunni" | "shia";
 
@@ -67,4 +73,100 @@ export function filterThemes(options: {
 
     return true;
   });
+}
+
+/**
+ * Expand verse range strings (e.g. "2:153", "2:155-157", "103:1-3") into individual verse keys
+ */
+export function parseVerseSpecs(
+  verseSpecs: string[],
+): { surah: number; ayah: number; key: string }[] {
+  const result: { surah: number; ayah: number; key: string }[] = [];
+  const seen = new Set<string>();
+
+  for (const spec of verseSpecs) {
+    const [surahStr, ayahRange] = spec.split(":");
+    const surah = parseInt(surahStr, 10);
+    if (!Number.isFinite(surah)) continue;
+
+    if (!ayahRange) continue;
+
+    if (ayahRange.includes("-")) {
+      const [startStr, endStr] = ayahRange.split("-");
+      const start = parseInt(startStr, 10);
+      const end = parseInt(endStr, 10);
+      if (Number.isFinite(start) && Number.isFinite(end)) {
+        for (let a = start; a <= end; a++) {
+          const key = `${surah}:${a}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            result.push({ surah, ayah: a, key });
+          }
+        }
+      }
+    } else {
+      const ayah = parseInt(ayahRange, 10);
+      if (Number.isFinite(ayah)) {
+        const key = `${surah}:${ayah}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          result.push({ surah, ayah, key });
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Automatically create or update a Research Project for a Theme, populating it with all theme verses
+ */
+export function getOrCreateThemeProject(
+  theme: ThemeEntry,
+  lang: "en" | "ur" = "en",
+): ResearchProject {
+  const projects = loadProjects();
+  const themeProjId = `theme_${theme.id}`;
+  const parsedVerses = parseVerseSpecs(theme.verses);
+  const versesMap: Record<string, true> = {};
+  parsedVerses.forEach((v) => {
+    versesMap[v.key] = true;
+  });
+
+  const projName = lang === "ur" ? `موضوع: ${theme.ur}` : `Theme: ${theme.en}`;
+  const projDesc =
+    lang === "ur"
+      ? `${theme.desc_ur} (${theme.source_note})`
+      : `${theme.desc_en} (${theme.source_note})`;
+
+  const existingIdx = projects.findIndex((p) => p.id === themeProjId);
+  if (existingIdx !== -1) {
+    const updatedProj: ResearchProject = {
+      ...projects[existingIdx],
+      name: projName,
+      description: projDesc,
+      verses: versesMap,
+      updatedAt: Date.now(),
+    };
+    projects[existingIdx] = updatedProj;
+    saveProjects(projects);
+    saveActiveProjectId(themeProjId);
+    return updatedProj;
+  }
+
+  const newProj: ResearchProject = {
+    id: themeProjId,
+    name: projName,
+    description: projDesc,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    verses: versesMap,
+    savedSearches: [],
+  };
+
+  const updated = [newProj, ...projects];
+  saveProjects(updated);
+  saveActiveProjectId(newProj.id);
+  return newProj;
 }

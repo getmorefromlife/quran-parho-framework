@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import {
   filterThemes,
   getThemeCategories,
+  parseVerseSpecs,
   THEMES,
   type ThemeEntry,
   type Tradition,
@@ -259,23 +260,25 @@ export function ThematicLibrary({ onOpenTheme }: Props) {
                   <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-between gap-3">
                     {/* Verse references list preview */}
                     <div className="min-w-0 flex-1">
-                      <span className="text-[11px] font-semibold text-gold bg-gold/10 px-2 py-0.5 rounded-full border border-gold/20 mr-2">
-                        {theme.verses.length} {tr("themes_verses")}
-                      </span>
-                      <span className="text-[10px] font-mono text-muted-foreground truncate hidden sm:inline">
-                        {theme.verses.slice(0, 3).join(", ")}
-                        {theme.verses.length > 3 ? "..." : ""}
-                      </span>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[11px] font-semibold text-gold bg-gold/10 px-2.5 py-0.5 rounded-full border border-gold/20">
+                          {parseVerseSpecs(theme.verses).length}{" "}
+                          {lang === "en" ? "verses combined" : "آیات مجموعی"}
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-mono text-muted-foreground truncate">
+                        {theme.verses.join(" · ")}
+                      </div>
                     </div>
 
                     {/* Action Button */}
                     <Button
                       onClick={() => onOpenTheme(theme)}
                       size="sm"
-                      className="bg-emerald-gradient hover:opacity-95 text-white shadow-gold text-xs px-3.5 py-1.5 h-8 gap-1.5 cursor-pointer shrink-0 rounded-xl"
+                      className="bg-emerald-gradient hover:opacity-95 text-white shadow-gold text-xs px-3.5 py-1.5 h-8 gap-1.5 cursor-pointer shrink-0 rounded-xl font-semibold"
                     >
                       <BookOpen className="h-3.5 w-3.5 text-gold" />
-                      <span>{tr("themes_open")}</span>
+                      <span>{lang === "en" ? "Open Project" : "پروجیکٹ میں دیکھیں"}</span>
                     </Button>
                   </div>
                 </div>
