@@ -326,8 +326,8 @@ export function PresentationMode({
   const transDisplayRem =
     (viewMode === "turn_block"
       ? contentMode === "translation_only"
-        ? 0.75
-        : 0.55
+        ? 1.1
+        : 0.85
       : contentMode === "translation_only"
         ? 2.0
         : 1.25) * transFontRem;
@@ -343,23 +343,35 @@ export function PresentationMode({
     }
   };
 
-  // Navigate next verse
+  // Navigate next verse / next block
   const handleNext = useCallback(() => {
-    if (currentAyah < maxVerses) {
+    if (viewMode === "turn_block") {
+      if (blockEnd < maxVerses) {
+        onNavigateAyah(Math.min(blockEnd + 1, maxVerses));
+      } else if (surahN < 114) {
+        onNavigateSurah(surahN + 1);
+      }
+    } else if (currentAyah < maxVerses) {
       onNavigateAyah(currentAyah + 1);
     } else if (surahN < 114) {
       onNavigateSurah(surahN + 1);
     }
-  }, [currentAyah, maxVerses, surahN, onNavigateAyah, onNavigateSurah]);
+  }, [viewMode, blockEnd, maxVerses, currentAyah, surahN, onNavigateAyah, onNavigateSurah]);
 
-  // Navigate prev verse
+  // Navigate prev verse / previous block
   const handlePrev = useCallback(() => {
-    if (currentAyah > 1) {
+    if (viewMode === "turn_block") {
+      if (blockStart > 1) {
+        onNavigateAyah(Math.max(blockStart - 5, 1));
+      } else if (surahN > 1) {
+        onNavigateSurah(surahN - 1);
+      }
+    } else if (currentAyah > 1) {
       onNavigateAyah(currentAyah - 1);
     } else if (surahN > 1) {
       onNavigateSurah(surahN - 1);
     }
-  }, [currentAyah, surahN, onNavigateAyah, onNavigateSurah]);
+  }, [viewMode, blockStart, currentAyah, surahN, onNavigateAyah, onNavigateSurah]);
 
   // Keyboard navigation & remote control listeners
   useEffect(() => {
@@ -738,7 +750,7 @@ export function PresentationMode({
                 {transDisplayRem.toFixed(1)}
               </span>
               <button
-                onClick={() => setTransFontRem((s) => Math.min(2.6, s + 0.2))}
+                onClick={() => setTransFontRem((s) => Math.min(4.0, s + 0.2))}
                 className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
                 title="Increase Translation Font Size"
               >
@@ -900,20 +912,13 @@ export function PresentationMode({
               </div>
 
               {/* List of Verses in this Turn Block */}
-              <div
-                dir={stageDir}
-                className={cn(
-                  "gap-4",
-                  layoutWidth === "wide" ? "grid lg:grid-cols-2 xl:grid-cols-3" : "space-y-8",
-                  allRtl ? "text-right" : "text-left",
-                )}
-              >
+              <div dir={stageDir} className={cn("space-y-6", allRtl ? "text-right" : "text-left")}>
                 {turnBlockVerses.map((v) => {
                   const trans = renderTrans(
                     v,
                     contentMode === "translation_only"
-                      ? { ltr: 0.75 * transFontRem, rtl: 0.85 * transFontRem }
-                      : { ltr: 0.55 * transFontRem, rtl: 0.65 * transFontRem },
+                      ? { ltr: 1.1 * transFontRem, rtl: 1.2 * transFontRem }
+                      : { ltr: 0.85 * transFontRem, rtl: 0.95 * transFontRem },
                     true,
                   );
                   return (
@@ -963,38 +968,11 @@ export function PresentationMode({
                       ) : contentMode === "arabic_only" ? (
                         /* Arabic-Only Calligraphy Mode */
                         renderArabic(v, arabicFontRem * 0.9)
-                      ) : layoutWidth === "wide" ? (
-                        /* Both (Wide 2-Column Layout): Left = Translations | Right = Arabic */
-                        <div className="grid md:grid-cols-12 gap-6 items-center">
-                          {/* Left Side (Cols 1 to 6): Translations */}
-                          <div
-                            dir={stageDir}
-                            className={cn(
-                              "md:col-span-6 space-y-2 order-2 md:order-1",
-                              allRtl ? "text-right" : "text-left",
-                            )}
-                          >
-                            {trans.length ? (
-                              trans
-                            ) : (
-                              <p
-                                className={cn("text-sm italic opacity-60", currentTheme.transText)}
-                              >
-                                {tr("present_no_translation")}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Right Side (Cols 7 to 12): Arabic Calligraphy & Ayah Number */}
-                          <div className="md:col-span-6 order-1 md:order-2">
-                            {renderArabic(v, arabicFontRem * 0.85)}
-                          </div>
-                        </div>
                       ) : (
-                        /* Both (Standard Stacked Layout) */
+                        /* Both (Stacked Layout): Arabic Above, Translation Boxes Below */
                         <div
                           dir={stageDir}
-                          className={cn("space-y-3", allRtl ? "text-right" : "text-left")}
+                          className={cn("space-y-4", allRtl ? "text-right" : "text-left")}
                         >
                           {renderArabic(v, arabicFontRem * 0.85)}
 

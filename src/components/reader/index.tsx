@@ -222,6 +222,10 @@ export function SurahReader({
     setCircleTurn(1);
   }, [surahN, prefs.circleChunkSize]);
 
+  useEffect(() => {
+    setSelectedVerse(null);
+  }, [surahN]);
+
   const refreshProjectData = useCallback(() => {
     setActiveProject(getActiveProject());
     setFavorites(loadFavorites());
