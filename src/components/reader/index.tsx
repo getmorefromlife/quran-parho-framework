@@ -21,6 +21,7 @@ import {
   Users,
   X,
   BookOpenCheck,
+  MonitorPlay,
 } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { SURAHS } from "@/lib/surahs";
@@ -73,6 +74,7 @@ import { FloatingSettings, ReaderSettingsPanel } from "@/components/reader/setti
 import { CircleTurnBar } from "@/components/reader/circle-turn-bar";
 import { ThemePlaylistBar } from "@/components/reader/theme-playlist-bar";
 import { HifzControls } from "@/components/reader/hifz-controls";
+import { PresentationMode } from "@/components/reader/presentation-mode";
 import { loadHifzPrefs, saveHifzPrefs, type HifzPrefs } from "@/lib/hifz-settings";
 import { createThemePlaylist, type ThemeEntry, type ThemePlaylistItem } from "@/lib/themes";
 import { cn } from "@/lib/utils";
@@ -195,6 +197,9 @@ export function SurahReader({
   // ── Hifz Memorization Suite State ──
   const [hifzPrefs, setHifzPrefs] = useState<HifzPrefs>(() => loadHifzPrefs());
   const [hifzRepeatIndex, setHifzRepeatIndex] = useState(0);
+
+  // ── Presentation / Projector Mode State ──
+  const [showPresentationMode, setShowPresentationMode] = useState(false);
 
   const updateHifzPrefs = (next: HifzPrefs) => {
     setHifzPrefs(next);
@@ -817,6 +822,15 @@ export function SurahReader({
           </button>
           <button
             type="button"
+            onClick={() => setShowPresentationMode(true)}
+            aria-label={tr("projector_mode")}
+            title={tr("projector_mode")}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:border-gold/60 transition-colors cursor-pointer"
+          >
+            <MonitorPlay className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
             onClick={() => openSavedPanel(savedTab)}
             aria-label="Saved verses"
             className={cn(
@@ -913,6 +927,34 @@ export function SurahReader({
           onChange={updateHifzPrefs}
           repeatIndex={hifzRepeatIndex}
           onClose={() => updateHifzPrefs({ ...hifzPrefs, enabled: false })}
+        />
+      )}
+
+      {/* Live Projector / Presentation Mode */}
+      {showPresentationMode && (
+        <PresentationMode
+          surahN={surahN}
+          verses={verses || []}
+          currentAyah={selectedVerse || rangeStart}
+          maxVerses={maxVerses}
+          surahEn={surah.en}
+          surahAr={surah.ar}
+          onNavigateAyah={(aN) => {
+            setSelectedVerse(aN);
+            const node = verseRefs.current.get(aN);
+            if (node && scrollRef.current) {
+              const top = node.getBoundingClientRect().top + scrollRef.current.scrollTop - 90;
+              scrollRef.current.scrollTo({ top, behavior: "smooth" });
+            }
+          }}
+          onNavigateSurah={(sN) => onNavigate(sN)}
+          audioPlaying={audioPlaying}
+          onToggleAudio={(aN) => togglePlay(aN)}
+          onClose={() => setShowPresentationMode(false)}
+          turnNumber={prefs.circleModeEnabled ? currentTurn : undefined}
+          totalTurns={prefs.circleModeEnabled ? totalTurns : undefined}
+          turnStartAyah={prefs.circleModeEnabled ? turnStartAyah : undefined}
+          turnEndAyah={prefs.circleModeEnabled ? turnEndAyah : undefined}
         />
       )}
 
