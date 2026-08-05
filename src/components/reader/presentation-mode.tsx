@@ -172,6 +172,11 @@ export function PresentationMode({
   const activeTransDefs = activeTrans
     .map(getTranslation)
     .filter((t): t is TranslationDef => Boolean(t));
+
+  // Direction of the active translations: RTL (ur/fa) flows right→left, LTR (en/de) left→right
+  const allRtl = activeTransDefs.length > 0 && activeTransDefs.every((d) => d.dir === "rtl");
+  const stageDir: "rtl" | "ltr" = allRtl ? "rtl" : "ltr";
+
   const [showPrompts, setShowPrompts] = useState(false);
 
   // Content Display Mode: both (Arabic+Translation) | translation_only | arabic_only
@@ -204,29 +209,75 @@ export function PresentationMode({
 
   const currentTheme = THEMES[themeStyle];
 
-  // Render the active selected translations for a verse
+  // Render the active selected translations for a verse, each with its own
+  // inline ayah number at the language's reading-direction anchor
   const renderTrans = (v: QVerse, size: { ltr: number; rtl: number }): ReactNode[] => {
     return activeTransDefs.flatMap((tDef) => {
       const text = getTranslationText(v as unknown as Record<string, unknown>, tDef.id);
       if (!text) return [];
       const isRTL = tDef.dir === "rtl";
+      const num = (
+        <span
+          key="num"
+          className={cn(
+            "inline-flex h-[1.6em] w-[1.6em] shrink-0 items-center justify-center rounded-full border align-middle text-[0.55em] font-bold",
+            currentTheme.badgeBg,
+            currentTheme.badgeText,
+          )}
+        >
+          {v.ayah}
+        </span>
+      );
       return [
         <p
           key={tDef.id}
           dir={tDef.dir}
           className={cn(
-            "leading-relaxed transition-all",
+            "leading-relaxed transition-all flex items-baseline gap-2",
             isRTL
-              ? cn("font-arabic text-right", currentTheme.urduText)
-              : cn("font-serif", currentTheme.transText),
+              ? cn("font-arabic text-right justify-end", currentTheme.urduText)
+              : cn("font-serif text-left", currentTheme.transText),
           )}
           style={{ fontSize: `${isRTL ? size.rtl : size.ltr}rem` }}
         >
-          "{text}"
+          {isRTL ? (
+            <>
+              <span className="flex-1">"{text}"</span>
+              {num}
+            </>
+          ) : (
+            <>
+              {num}
+              <span className="flex-1">"{text}"</span>
+            </>
+          )}
         </p>,
       ];
     });
   };
+
+  // Render Arabic calligraphy with the ayah number as an inline RTL end-marker
+  const renderArabic = (v: QVerse, fontSize: number): ReactNode => (
+    <p
+      dir="rtl"
+      className={cn(
+        "font-arabic font-semibold leading-relaxed tracking-wide text-right flex items-baseline gap-3",
+        currentTheme.gold,
+      )}
+      style={{ fontSize: `${fontSize}rem` }}
+    >
+      <span className="flex-1">{v.arabic}</span>
+      <span
+        className={cn(
+          "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-sm font-bold align-middle",
+          currentTheme.badgeBg,
+          currentTheme.badgeText,
+        )}
+      >
+        {v.ayah}
+      </span>
+    </p>
+  );
 
   const singleTrans = activeVerse ? renderTrans(activeVerse, { ltr: 1.25, rtl: 1.3 }) : [];
 
@@ -763,9 +814,11 @@ export function PresentationMode({
 
               {/* List of Verses in this Turn Block */}
               <div
+                dir={stageDir}
                 className={cn(
-                  "gap-4 text-left",
+                  "gap-4",
                   layoutWidth === "wide" ? "grid lg:grid-cols-2 xl:grid-cols-3" : "space-y-8",
+                  allRtl ? "text-right" : "text-left",
                 )}
               >
                 {turnBlockVerses.map((v) => {
@@ -786,7 +839,7 @@ export function PresentationMode({
                     >
                       {contentMode === "translation_only" ? (
                         /* Translation-Only Focus Mode — Respects Reader Settings Selection */
-                        <div className="space-y-4 text-left">
+                        <div dir={stageDir} className="space-y-4">
                           <div className="flex items-center gap-2">
                             <span
                               className={cn(
@@ -807,7 +860,13 @@ export function PresentationMode({
                             </span>
                           </div>
                           {trans.length ? (
-                            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3 text-left">
+                            <div
+                              dir={stageDir}
+                              className={cn(
+                                "grid gap-4 lg:grid-cols-2 xl:grid-cols-3",
+                                allRtl ? "text-right" : "text-left",
+                              )}
+                            >
                               {trans}
                             </div>
                           ) : (
@@ -818,32 +877,18 @@ export function PresentationMode({
                         </div>
                       ) : contentMode === "arabic_only" ? (
                         /* Arabic-Only Calligraphy Mode */
-                        <div className="flex items-start justify-between gap-4">
-                          <span
-                            className={cn(
-                              "inline-flex align-middle h-8 w-8 items-center justify-center rounded-full border text-sm font-bold shrink-0",
-                              currentTheme.badgeBg,
-                              currentTheme.badgeText,
-                            )}
-                          >
-                            {v.ayah}
-                          </span>
-                          <p
-                            dir="rtl"
-                            className={cn(
-                              "font-arabic font-semibold leading-relaxed tracking-wide text-right flex-1",
-                              currentTheme.gold,
-                            )}
-                            style={{ fontSize: `${fontSizeRem * 0.9}rem` }}
-                          >
-                            {v.arabic}
-                          </p>
-                        </div>
+                        renderArabic(v, fontSizeRem * 0.9)
                       ) : layoutWidth === "wide" ? (
                         /* Both (Wide 2-Column Layout): Left = Translations | Right = Arabic */
                         <div className="grid md:grid-cols-12 gap-6 items-center">
-                          {/* Left Side (Cols 1 to 6): English & Urdu Translations */}
-                          <div className="md:col-span-6 space-y-2 text-left order-2 md:order-1">
+                          {/* Left Side (Cols 1 to 6): Translations */}
+                          <div
+                            dir={stageDir}
+                            className={cn(
+                              "md:col-span-6 space-y-2 order-2 md:order-1",
+                              allRtl ? "text-right" : "text-left",
+                            )}
+                          >
                             {trans.length ? (
                               trans
                             ) : (
@@ -856,62 +901,22 @@ export function PresentationMode({
                           </div>
 
                           {/* Right Side (Cols 7 to 12): Arabic Calligraphy & Ayah Number */}
-                          <div className="md:col-span-6 flex items-start justify-end gap-4 order-1 md:order-2">
-                            <p
-                              dir="rtl"
-                              className={cn(
-                                "font-arabic font-semibold leading-relaxed tracking-wide text-right flex-1",
-                                currentTheme.gold,
-                              )}
-                              style={{ fontSize: `${fontSizeRem * 0.85}rem` }}
-                            >
-                              {v.arabic}
-                            </p>
-                            <span
-                              className={cn(
-                                "inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold shrink-0",
-                                currentTheme.badgeBg,
-                                currentTheme.badgeText,
-                              )}
-                            >
-                              {v.ayah}
-                            </span>
+                          <div className="md:col-span-6 order-1 md:order-2">
+                            {renderArabic(v, fontSizeRem * 0.85)}
                           </div>
                         </div>
                       ) : (
                         /* Both (Standard Stacked Layout) */
-                        <div className="space-y-3">
-                          <div className="flex items-start justify-between gap-4">
-                            <span
-                              className={cn(
-                                "inline-flex align-middle h-8 w-8 items-center justify-center rounded-full border text-sm font-bold shrink-0",
-                                currentTheme.badgeBg,
-                                currentTheme.badgeText,
-                              )}
-                            >
-                              {v.ayah}
-                            </span>
-                            <p
-                              dir="rtl"
-                              className={cn(
-                                "font-arabic font-semibold leading-relaxed tracking-wide text-right flex-1",
-                                currentTheme.gold,
-                              )}
-                              style={{ fontSize: `${fontSizeRem * 0.85}rem` }}
-                            >
-                              {v.arabic}
-                            </p>
-                          </div>
+                        <div
+                          dir={stageDir}
+                          className={cn("space-y-3", allRtl ? "text-right" : "text-left")}
+                        >
+                          {renderArabic(v, fontSizeRem * 0.85)}
 
                           {trans.length ? (
                             trans
                           ) : (
-                            <p
-                              className={cn(
-                                "text-sm italic opacity-60 pl-12",
-                                currentTheme.transText,
-                              )}
-                            >
+                            <p className={cn("text-sm italic opacity-60", currentTheme.transText)}>
                               {tr("present_no_translation")}
                             </p>
                           )}
@@ -973,23 +978,15 @@ export function PresentationMode({
                 </Button>
               </div>
 
-              {/* Ultra-Large Arabic Text */}
+              {/* Ultra-Large Arabic Text with Ayah Number */}
+              {activeVerse && renderArabic(activeVerse, fontSizeRem)}
+
+              {/* Translations */}
               {activeVerse && (
                 <div
-                  dir="rtl"
-                  className={cn(
-                    "font-arabic font-semibold leading-relaxed tracking-wide transition-all duration-300",
-                    currentTheme.gold,
-                  )}
-                  style={{ fontSize: `${fontSizeRem}rem` }}
+                  dir={stageDir}
+                  className="space-y-4 max-w-4xl mx-auto pt-4 border-t border-zinc-800/60"
                 >
-                  {activeVerse.arabic}
-                </div>
-              )}
-
-              {/* English & Urdu Translations */}
-              {activeVerse && (
-                <div className="space-y-4 max-w-4xl mx-auto pt-4 border-t border-zinc-800/60">
                   {singleTrans.length ? (
                     singleTrans
                   ) : (
