@@ -6,7 +6,10 @@ import { cn } from "@/lib/utils";
 export function Hero() {
   const { tr, lang } = useLang();
   return (
-    <section id="top" className="relative overflow-hidden min-h-[calc(100vh-80px)] flex items-center">
+    <section
+      id="top"
+      className="relative overflow-hidden min-h-[calc(100vh-80px)] flex items-center"
+    >
       <div className="absolute inset-0 pointer-events-none">
         {Array.from({ length: 14 }).map((_, i) => (
           <span

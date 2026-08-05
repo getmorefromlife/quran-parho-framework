@@ -36,7 +36,8 @@
   --font-serif-display: "Cinzel", "Playfair Display", serif;
   --font-sans: "Plus Jakarta Sans", "Inter", sans-serif;
   --font-urdu: "Gulzar", "Noto Nastaliq Urdu", "Noto Naskh Arabic", serif;
-  --font-arabic: "KFGQPC Uthman Taha Naskh", "Amiri Quran", "Scheherazade New", "Noto Naskh Arabic", serif;
+  --font-arabic:
+    "KFGQPC Uthman Taha Naskh", "Amiri Quran", "Scheherazade New", "Noto Naskh Arabic", serif;
 }
 
 :root {
@@ -63,7 +64,9 @@
   --gold: oklch(0.75 0.13 85);
   --gold-soft: oklch(0.85 0.09 85);
   --emerald-deep: oklch(0.36 0.09 160);
-  --gradient-hero: radial-gradient(ellipse at top, oklch(0.92 0.06 85 / 0.6), transparent 60%), linear-gradient(180deg, oklch(0.985 0.008 85), oklch(0.96 0.015 85));
+  --gradient-hero:
+    radial-gradient(ellipse at top, oklch(0.92 0.06 85 / 0.6), transparent 60%),
+    linear-gradient(180deg, oklch(0.985 0.008 85), oklch(0.96 0.015 85));
   --gradient-emerald: linear-gradient(135deg, oklch(0.36 0.09 160), oklch(0.28 0.07 160));
   --gradient-gold: linear-gradient(135deg, oklch(0.82 0.13 85), oklch(0.68 0.13 75));
   --shadow-elegant: 0 20px 60px -20px oklch(0.36 0.09 160 / 0.25);
@@ -93,13 +96,17 @@
   --gold: oklch(0.82 0.14 85);
   --gold-soft: oklch(0.7 0.11 85);
   --emerald-deep: oklch(0.55 0.11 160);
-  --gradient-hero: radial-gradient(ellipse at top, oklch(0.4 0.09 160 / 0.4), transparent 60%), linear-gradient(180deg, oklch(0.18 0.02 250), oklch(0.14 0.02 250));
+  --gradient-hero:
+    radial-gradient(ellipse at top, oklch(0.4 0.09 160 / 0.4), transparent 60%),
+    linear-gradient(180deg, oklch(0.18 0.02 250), oklch(0.14 0.02 250));
   --shadow-elegant: 0 20px 60px -20px oklch(0 0 0 / 0.6);
   --shadow-gold: 0 10px 40px -10px oklch(0.82 0.14 85 / 0.4);
 }
 
 @layer base {
-  * { border-color: var(--color-border); }
+  * {
+    border-color: var(--color-border);
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
@@ -109,37 +116,77 @@
   .urdu {
     font-family: var(--font-urdu);
   }
-  h1, h2, h3, .display {
+  h1,
+  h2,
+  h3,
+  .display {
     font-family: var(--font-serif-display);
     letter-spacing: -0.01em;
   }
-  html[dir="rtl"] h1, html[dir="rtl"] h2, html[dir="rtl"] h3, html[dir="rtl"] .display {
+  html[dir="rtl"] h1,
+  html[dir="rtl"] h2,
+  html[dir="rtl"] h3,
+  html[dir="rtl"] .display {
     font-family: var(--font-urdu);
     letter-spacing: 0;
   }
 }
 
-@utility bg-hero { background: var(--gradient-hero); }
-@utility bg-emerald-gradient { background: var(--gradient-emerald); }
-@utility bg-gold-gradient { background: var(--gradient-gold); }
-@utility shadow-elegant { box-shadow: var(--shadow-elegant); }
-@utility shadow-gold { box-shadow: var(--shadow-gold); }
-@utility text-gold { color: var(--gold); }
-@utility border-gold { border-color: var(--gold); }
-@utility bg-gold { background-color: var(--gold); }
-@utility ring-gold { --tw-ring-color: var(--gold); }
+@utility bg-hero {
+  background: var(--gradient-hero);
+}
+@utility bg-emerald-gradient {
+  background: var(--gradient-emerald);
+}
+@utility bg-gold-gradient {
+  background: var(--gradient-gold);
+}
+@utility shadow-elegant {
+  box-shadow: var(--shadow-elegant);
+}
+@utility shadow-gold {
+  box-shadow: var(--shadow-gold);
+}
+@utility text-gold {
+  color: var(--gold);
+}
+@utility border-gold {
+  border-color: var(--gold);
+}
+@utility bg-gold {
+  background-color: var(--gold);
+}
+@utility ring-gold {
+  --tw-ring-color: var(--gold);
+}
 
 @keyframes float-particle {
-  0%, 100% { transform: translateY(0) translateX(0); opacity: 0.6; }
-  50% { transform: translateY(-20px) translateX(10px); opacity: 1; }
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-20px) translateX(10px);
+    opacity: 1;
+  }
 }
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 @keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 20px oklch(0.75 0.13 85 / 0.4); }
-  50% { box-shadow: 0 0 40px oklch(0.75 0.13 85 / 0.7); }
+  0%,
+  100% {
+    box-shadow: 0 0 20px oklch(0.75 0.13 85 / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 40px oklch(0.75 0.13 85 / 0.7);
+  }
 }
 
 @font-face {
@@ -158,8 +205,12 @@
   font-display: swap;
 }
 
-.particle { animation: float-particle 6s ease-in-out infinite; }
-.glow-pulse { animation: glow-pulse 3s ease-in-out infinite; }
+.particle {
+  animation: float-particle 6s ease-in-out infinite;
+}
+.glow-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
 .shimmer-gold {
   background: linear-gradient(90deg, transparent, oklch(0.85 0.14 85 / 0.4), transparent);
   background-size: 200% 100%;

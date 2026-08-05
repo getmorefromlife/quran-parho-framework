@@ -867,7 +867,9 @@ export function SessionPhaseTimer({
                     onClick={() => setShowQA((s) => !s)}
                     className={cn(
                       "h-8 px-2.5 text-xs border border-gold/40 font-bold",
-                      showQA ? "bg-emerald-gradient text-gold" : "bg-background text-muted-foreground",
+                      showQA
+                        ? "bg-emerald-gradient text-gold"
+                        : "bg-background text-muted-foreground",
                     )}
                   >
                     <MessageCircle className="h-3.5 w-3.5" />
@@ -897,383 +899,392 @@ export function SessionPhaseTimer({
             </div>
 
             <div className="space-y-6">
-            {/* Twin timers — phase + Q&A on one screen */}
-            <div className={cn("grid gap-4", showQA && "lg:grid-cols-2")}>
-              {/* Phase timer */}
-              <div className="rounded-2xl border border-border bg-background p-5 sm:p-8 text-center">
-                <div
-                  className={cn(
-                    "text-sm sm:text-base uppercase tracking-widest font-semibold",
-                    phase === "reading" ? "text-emerald-deep" : "text-gold",
-                  )}
-                >
-                  {phase === "reading"
-                    ? lang === "en"
-                      ? "Reading Phase"
-                      : "ترجمہ"
-                    : lang === "en"
-                      ? "Discussion Phase"
-                      : "مباحثہ"}
-                </div>
-                <div
-                  className={cn(
-                    "mt-3 text-4xl sm:text-5xl lg:text-6xl font-black uppercase tracking-tight leading-tight pb-1",
-                    phase === "reading" ? "text-emerald-deep" : "text-gold",
-                  )}
-                >
-                  {phase === "reading"
-                    ? lang === "ur"
-                      ? "القراءة"
-                      : "READING"
-                    : lang === "ur"
-                      ? "المناقشة"
-                      : "DISCUSSION"}
-                </div>
-                <div
-                  className={cn(
-                    "mt-4 sm:mt-6 text-5xl sm:text-6xl lg:text-7xl font-bold font-mono tabular-nums",
-                    phase === "reading" ? "text-emerald-deep/70" : "text-gold/70",
-                  )}
-                >
-                  {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
-                </div>
-                <div className="mt-3 text-base sm:text-lg text-muted-foreground">
-                  {phase === "reading"
-                    ? lang === "en"
-                      ? `Discussion in ${Math.ceil((readingSeconds - elapsed) / 60)} min`
-                      : `مباحثہ ${Math.ceil((readingSeconds - elapsed) / 60)} منٹ میں`
-                    : lang === "en"
-                      ? `${Math.ceil((totalSeconds - elapsed) / 60)} min remaining`
-                      : `${Math.ceil((totalSeconds - elapsed) / 60)} منٹ باقی`}
-                </div>
-              </div>
-
-              {/* Q&A timer */}
-              {showQA && (
-                <div className="rounded-2xl border border-gold/40 bg-background p-5 sm:p-8 text-center">
-                  <div className="text-sm sm:text-base uppercase tracking-widest text-gold font-semibold">
-                    ⚡ {lang === "en" ? "Question Timer" : "سوال کا ٹائمر"}
+              {/* Twin timers — phase + Q&A on one screen */}
+              <div className={cn("grid gap-4", showQA && "lg:grid-cols-2")}>
+                {/* Phase timer */}
+                <div className="rounded-2xl border border-border bg-background p-5 sm:p-8 text-center">
+                  <div
+                    className={cn(
+                      "text-sm sm:text-base uppercase tracking-widest font-semibold",
+                      phase === "reading" ? "text-emerald-deep" : "text-gold",
+                    )}
+                  >
+                    {phase === "reading"
+                      ? lang === "en"
+                        ? "Reading Phase"
+                        : "ترجمہ"
+                      : lang === "en"
+                        ? "Discussion Phase"
+                        : "مباحثہ"}
                   </div>
                   <div
                     className={cn(
-                      "mt-4 text-6xl sm:text-6xl font-bold font-mono tabular-nums",
-                      qaSeconds <= 10 && qaRunning ? "text-destructive" : "text-gold",
+                      "mt-3 text-4xl sm:text-5xl lg:text-6xl font-black uppercase tracking-tight leading-tight pb-1",
+                      phase === "reading" ? "text-emerald-deep" : "text-gold",
                     )}
                   >
-                    {String(Math.floor(qaSeconds / 60)).padStart(2, "0")}:
-                    {String(qaSeconds % 60).padStart(2, "0")}
+                    {phase === "reading"
+                      ? lang === "ur"
+                        ? "القراءة"
+                        : "READING"
+                      : lang === "ur"
+                        ? "المناقشة"
+                        : "DISCUSSION"}
                   </div>
-                  <div className="mt-5 flex flex-wrap justify-center gap-2">
-                    {[30, 60, 120, 180, 300].map((s) => (
+                  <div
+                    className={cn(
+                      "mt-4 sm:mt-6 text-5xl sm:text-6xl lg:text-7xl font-bold font-mono tabular-nums",
+                      phase === "reading" ? "text-emerald-deep/70" : "text-gold/70",
+                    )}
+                  >
+                    {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+                  </div>
+                  <div className="mt-3 text-base sm:text-lg text-muted-foreground">
+                    {phase === "reading"
+                      ? lang === "en"
+                        ? `Discussion in ${Math.ceil((readingSeconds - elapsed) / 60)} min`
+                        : `مباحثہ ${Math.ceil((readingSeconds - elapsed) / 60)} منٹ میں`
+                      : lang === "en"
+                        ? `${Math.ceil((totalSeconds - elapsed) / 60)} min remaining`
+                        : `${Math.ceil((totalSeconds - elapsed) / 60)} منٹ باقی`}
+                  </div>
+                </div>
+
+                {/* Q&A timer */}
+                {showQA && (
+                  <div className="rounded-2xl border border-gold/40 bg-background p-5 sm:p-8 text-center">
+                    <div className="text-sm sm:text-base uppercase tracking-widest text-gold font-semibold">
+                      ⚡ {lang === "en" ? "Question Timer" : "سوال کا ٹائمر"}
+                    </div>
+                    <div
+                      className={cn(
+                        "mt-4 text-6xl sm:text-6xl font-bold font-mono tabular-nums",
+                        qaSeconds <= 10 && qaRunning ? "text-destructive" : "text-gold",
+                      )}
+                    >
+                      {String(Math.floor(qaSeconds / 60)).padStart(2, "0")}:
+                      {String(qaSeconds % 60).padStart(2, "0")}
+                    </div>
+                    <div className="mt-5 flex flex-wrap justify-center gap-2">
+                      {[30, 60, 120, 180, 300].map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => {
+                            if (!qaRunning) {
+                              setQaDuration(s);
+                              setQaSeconds(s);
+                            }
+                          }}
+                          className={cn(
+                            "px-4 py-2.5 rounded-full text-sm font-semibold border transition-all",
+                            qaDuration === s
+                              ? "bg-emerald-gradient text-gold border-gold shadow-gold"
+                              : "bg-background border-border text-muted-foreground hover:border-gold/60",
+                          )}
+                        >
+                          {s < 60 ? `${s}s` : `${s / 60}m`}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-5 flex flex-wrap justify-center gap-2.5">
+                      {!qaRunning ? (
+                        <Button
+                          onClick={qaStart}
+                          className="bg-emerald-gradient text-gold border border-gold/40 h-11 sm:h-10 text-sm px-5 sm:px-4"
+                        >
+                          <Play className="h-4 w-4" /> {lang === "en" ? "Start" : "شروع"}
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={qaStop}
+                          className="bg-gold-gradient text-emerald-deep border border-gold/40 h-11 sm:h-10 text-sm px-5 sm:px-4"
+                        >
+                          <Pause className="h-4 w-4" /> {lang === "en" ? "Stop" : "روکیں"}
+                        </Button>
+                      )}
+                      <Button
+                        onClick={qaReset}
+                        variant="outline"
+                        className="border-gold/40 h-11 sm:h-10 text-sm px-5 sm:px-4"
+                      >
+                        <RotateCcw className="h-4 w-4" /> {lang === "en" ? "Reset" : "دوبارہ"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Progress bar */}
+              <div className="relative h-4 rounded-full bg-muted overflow-hidden">
+                <div className="absolute inset-0 flex">
+                  <div className="bg-emerald-gradient" style={{ width: `${readingPct}%` }} />
+                  <div className="bg-gold-gradient" style={{ width: `${100 - readingPct}%` }} />
+                </div>
+                <div className="absolute inset-0 rounded-full border border-border" />
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-background shadow-lg transition-all duration-300 z-10"
+                  style={{ left: `${pct}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground uppercase tracking-wider -mt-4">
+                <span>
+                  {lang === "en" ? "Reading" : "ترجمہ"} ({readingMins}m)
+                </span>
+                <span>
+                  {lang === "en" ? "Discussion" : "مباحثہ"} ({discussionMins}m)
+                </span>
+              </div>
+
+              {/* ── Participants compact ── */}
+              {participants.length > 0 && (
+                <div className="pt-1">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-gold font-semibold mb-2">
+                    <Users className="h-3.5 sm:h-3 w-3.5 sm:w-3" />{" "}
+                    {lang === "en" ? "Participants" : "شرکاء"}
+                  </div>
+                  <div className="flex flex-wrap gap-2 sm:gap-1.5">
+                    {participants.map((p) => (
                       <button
-                        key={s}
-                        onClick={() => {
-                          if (!qaRunning) {
-                            setQaDuration(s);
-                            setQaSeconds(s);
-                          }
-                        }}
+                        key={p.id}
+                        onClick={() => toggleRead(p.id)}
                         className={cn(
-                          "px-4 py-2.5 rounded-full text-sm font-semibold border transition-all",
-                          qaDuration === s
-                            ? "bg-emerald-gradient text-gold border-gold shadow-gold"
-                            : "bg-background border-border text-muted-foreground hover:border-gold/60",
+                          "inline-flex items-center gap-1.5 sm:gap-1 px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-full text-sm sm:text-xs font-medium border transition-all",
+                          p.read
+                            ? "bg-emerald-gradient text-gold border-gold"
+                            : "bg-background border-border text-muted-foreground line-through",
                         )}
                       >
-                        {s < 60 ? `${s}s` : `${s / 60}m`}
+                        {p.read ? (
+                          <Check className="h-3 sm:h-2.5 w-3 sm:w-2.5 stroke-[3]" />
+                        ) : (
+                          <span className="h-3 sm:h-2.5 w-3 sm:w-2.5 rounded border border-current" />
+                        )}
+                        {p.name}
                       </button>
                     ))}
                   </div>
-                  <div className="mt-5 flex flex-wrap justify-center gap-2.5">
-                    {!qaRunning ? (
-                      <Button
-                        onClick={qaStart}
-                        className="bg-emerald-gradient text-gold border border-gold/40 h-11 sm:h-10 text-sm px-5 sm:px-4"
-                      >
-                        <Play className="h-4 w-4" /> {lang === "en" ? "Start" : "شروع"}
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={qaStop}
-                        className="bg-gold-gradient text-emerald-deep border border-gold/40 h-11 sm:h-10 text-sm px-5 sm:px-4"
-                      >
-                        <Pause className="h-4 w-4" /> {lang === "en" ? "Stop" : "روکیں"}
-                      </Button>
+                </div>
+              )}
+
+              {/* ── Reading Log compact ── */}
+              <div className="pt-1">
+                <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-gold font-semibold mb-2">
+                  <BookOpen className="h-3.5 sm:h-3 w-3.5 sm:w-3" />{" "}
+                  {lang === "en" ? "Reading Log" : "تلاوت کا ریکارڈ"}
+                  {nextSurah && (
+                    <span className="text-muted-foreground font-normal normal-case text-xs">
+                      · {lang === "en" ? "Next" : "اگلا"}: {nextSurah.en}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5 items-end">
+                  <select
+                    value={logSurah}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      setLogSurah(v);
+                      const s = SURAHS.find((x) => x.n === v);
+                      if (s) {
+                        const newTo = readToEnd ? s.verses : Math.min(logTo, s.verses);
+                        setLogTo(newTo);
+                      }
+                    }}
+                    className="flex-1 min-w-[120px] px-2 py-2 sm:py-1.5 rounded-lg border border-gold/40 bg-background text-sm sm:text-xs"
+                  >
+                    {cycleSurahs.map((s) => {
+                      const done = completedInCycle.includes(s.n);
+                      return (
+                        <option
+                          key={s.n}
+                          value={s.n}
+                          className={done ? "text-muted-foreground" : ""}
+                        >
+                          {done ? "✓ " : ""}
+                          {s.n}. {s.en}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <NumInput
+                    value={logFrom}
+                    onChange={setLogFrom}
+                    min={1}
+                    max={SURAHS.find((s) => s.n === logSurah)?.verses || 300}
+                    className="w-16 sm:w-14 px-1.5 sm:px-1 py-2 sm:py-1.5 rounded-lg border border-gold/40 bg-background text-sm sm:text-xs text-center h-auto shadow-none"
+                  />
+                  <span className="text-sm sm:text-xs text-muted-foreground">–</span>
+                  <NumInput
+                    value={
+                      readToEnd ? SURAHS.find((s) => s.n === logSurah)?.verses || logTo : logTo
+                    }
+                    min={logFrom}
+                    max={SURAHS.find((s) => s.n === logSurah)?.verses || 300}
+                    disabled={readToEnd}
+                    onChange={setLogTo}
+                    className={cn(
+                      "w-16 sm:w-14 px-1.5 sm:px-1 py-2 sm:py-1.5 rounded-lg border border-gold/40 bg-background text-sm sm:text-xs text-center h-auto shadow-none",
+                      readToEnd && "opacity-50",
                     )}
+                  />
+                  <button
+                    onClick={() => setReadToEnd(!readToEnd)}
+                    className={cn(
+                      "h-10 sm:h-9 text-xs px-3 sm:px-2.5 rounded font-semibold border transition-all",
+                      readToEnd
+                        ? "bg-emerald-gradient text-gold border-gold"
+                        : "bg-background text-muted-foreground border-border",
+                    )}
+                  >
+                    {readToEnd ? "End" : "Cstm"}
+                  </button>
+                  <button
+                    onClick={addLogItem}
+                    className="h-10 sm:h-9 w-10 sm:w-9 rounded-lg bg-emerald-gradient text-gold grid place-items-center border border-gold/40 shrink-0"
+                  >
+                    <Plus className="h-4 sm:h-3.5 w-4 sm:w-3.5" />
+                  </button>
+                </div>
+                {/* Next surah hint if current surah is completed in progress */}
+                {nextSurah && logSurah !== nextSurah.n && (
+                  <div className="mt-1.5 sm:mt-1 text-xs text-muted-foreground flex items-center gap-1">
+                    <ArrowRight className="h-3 sm:h-2.5 w-3 sm:w-2.5 text-gold" />
+                    {lang === "en"
+                      ? "Done with this surah? Log it and we'll auto-advance to"
+                      : "یہ سورہ مکمل؟ لاگ کریں، اگلی سورہ"}{" "}
+                    <span className="font-medium text-foreground">{nextSurah.en}</span>
+                  </div>
+                )}
+                {readingLog.length > 0 && (
+                  <div className="mt-2 space-y-1 max-h-28 overflow-y-auto">
+                    {readingLog.map((x) => {
+                      const s = SURAHS.find((s) => s.n === x.surahN);
+                      const maxV = s?.verses || 0;
+                      const isFull = x.from === 1 && x.to === maxV;
+                      return (
+                        <div
+                          key={x.id}
+                          className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background border border-border text-xs"
+                        >
+                          <button
+                            onClick={() => toggleLogItem(x.id)}
+                            className={cn(
+                              "h-3.5 w-3.5 rounded border-2 grid place-items-center shrink-0",
+                              x.checked
+                                ? "bg-emerald-deep border-emerald-deep text-white"
+                                : "border-muted-foreground",
+                            )}
+                          >
+                            {x.checked && <Check className="h-2.5 w-2.5 stroke-[3]" />}
+                          </button>
+                          <span
+                            className={cn(
+                              "flex-1 truncate",
+                              !x.checked && "line-through text-muted-foreground",
+                            )}
+                          >
+                            {s?.en} ({x.from}–{x.to}){isFull ? " ✓" : ""}
+                          </span>
+                          <button
+                            onClick={() => removeLogItem(x.id)}
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Controls */}
+              <div className="flex justify-center gap-2.5 pt-2">
+                <Button
+                  onClick={pause}
+                  className="bg-gold-gradient text-emerald-deep border border-gold/40 h-10 sm:h-9 text-sm sm:text-xs px-4 sm:px-3"
+                >
+                  <Pause className="h-4 sm:h-3.5 w-4 sm:w-3.5" />{" "}
+                  {lang === "en" ? "Pause" : "روکیں"}
+                </Button>
+                <Button
+                  onClick={() => setShowQA((s) => !s)}
+                  className={cn(
+                    "h-10 sm:h-9 text-sm sm:text-xs border border-gold/40 px-4 sm:px-3",
+                    showQA
+                      ? "bg-emerald-gradient text-gold"
+                      : "bg-background text-muted-foreground",
+                  )}
+                >
+                  <MessageCircle className="h-4 sm:h-3.5 w-4 sm:w-3.5" /> QA
+                </Button>
+                <Button
+                  onClick={() => reset()}
+                  variant="outline"
+                  className="border-gold/40 h-10 sm:h-9 text-sm sm:text-xs px-4 sm:px-3"
+                >
+                  <RotateCcw className="h-4 sm:h-3.5 w-4 sm:w-3.5" />{" "}
+                  {lang === "en" ? "Reset" : "دوبارہ"}
+                </Button>
+              </div>
+              <div className="flex justify-center pt-2">
+                <Button
+                  onClick={openEndDialog}
+                  variant="outline"
+                  className="border-destructive/60 text-destructive hover:bg-destructive/10 h-10 sm:h-9 text-xs px-4 sm:px-3"
+                >
+                  <StopCircle className="h-4 sm:h-3.5 w-4 sm:w-3.5" />{" "}
+                  {lang === "en" ? "End Session" : "نشست ختم کریں"}
+                </Button>
+              </div>
+
+              {/* Deferred questions */}
+              {showQA && (
+                <div className="pt-4 border-t border-border space-y-3">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground font-semibold">
+                    <ListPlus className="h-3.5 w-3.5" />{" "}
+                    {lang === "en" ? "Defer Question" : "سوال مؤخر کریں"}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={qaQuestion}
+                      onChange={(e) => setQaQuestion(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && addQaDeferred()}
+                      placeholder={lang === "en" ? "Type a question..." : "سوال درج کریں..."}
+                      className="border-gold/40 h-10 text-sm"
+                    />
                     <Button
-                      onClick={qaReset}
-                      variant="outline"
-                      className="border-gold/40 h-11 sm:h-10 text-sm px-5 sm:px-4"
+                      size="sm"
+                      onClick={addQaDeferred}
+                      className="bg-emerald-gradient text-gold border border-gold/40 shrink-0 h-10"
                     >
-                      <RotateCcw className="h-4 w-4" /> {lang === "en" ? "Reset" : "دوبارہ"}
+                      <Plus className="h-4 w-4" />
                     </Button>
+                  </div>
+                  <div className="space-y-1 max-h-28 overflow-y-auto">
+                    {qaDeferred.length === 0 && (
+                      <p className="text-xs text-muted-foreground text-center py-1">
+                        {lang === "en" ? "No deferred questions." : "کوئی مؤخر سوال نہیں۔"}
+                      </p>
+                    )}
+                    {qaDeferred.map((q) => (
+                      <div
+                        key={q.id}
+                        className="flex items-start justify-between gap-2 p-2 rounded-lg bg-background border border-border"
+                      >
+                        <span className="text-sm">{q.text}</span>
+                        <button
+                          onClick={() => setQaDeferred((d) => d.filter((x) => x.id !== q.id))}
+                          className="shrink-0 text-muted-foreground hover:text-destructive"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
             </div>
-
-            {/* Progress bar */}
-            <div className="relative h-4 rounded-full bg-muted overflow-hidden">
-              <div className="absolute inset-0 flex">
-                <div className="bg-emerald-gradient" style={{ width: `${readingPct}%` }} />
-                <div className="bg-gold-gradient" style={{ width: `${100 - readingPct}%` }} />
-              </div>
-              <div className="absolute inset-0 rounded-full border border-border" />
-              <div
-                className="absolute top-0 bottom-0 w-0.5 bg-background shadow-lg transition-all duration-300 z-10"
-                style={{ left: `${pct}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-xs text-muted-foreground uppercase tracking-wider -mt-4">
-              <span>
-                {lang === "en" ? "Reading" : "ترجمہ"} ({readingMins}m)
-              </span>
-              <span>
-                {lang === "en" ? "Discussion" : "مباحثہ"} ({discussionMins}m)
-              </span>
-            </div>
-
-            {/* ── Participants compact ── */}
-            {participants.length > 0 && (
-              <div className="pt-1">
-                <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-gold font-semibold mb-2">
-                  <Users className="h-3.5 sm:h-3 w-3.5 sm:w-3" />{" "}
-                  {lang === "en" ? "Participants" : "شرکاء"}
-                </div>
-                <div className="flex flex-wrap gap-2 sm:gap-1.5">
-                  {participants.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => toggleRead(p.id)}
-                      className={cn(
-                        "inline-flex items-center gap-1.5 sm:gap-1 px-3 sm:px-2.5 py-1.5 sm:py-1 rounded-full text-sm sm:text-xs font-medium border transition-all",
-                        p.read
-                          ? "bg-emerald-gradient text-gold border-gold"
-                          : "bg-background border-border text-muted-foreground line-through",
-                      )}
-                    >
-                      {p.read ? (
-                        <Check className="h-3 sm:h-2.5 w-3 sm:w-2.5 stroke-[3]" />
-                      ) : (
-                        <span className="h-3 sm:h-2.5 w-3 sm:w-2.5 rounded border border-current" />
-                      )}
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ── Reading Log compact ── */}
-            <div className="pt-1">
-              <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-gold font-semibold mb-2">
-                <BookOpen className="h-3.5 sm:h-3 w-3.5 sm:w-3" />{" "}
-                {lang === "en" ? "Reading Log" : "تلاوت کا ریکارڈ"}
-                {nextSurah && (
-                  <span className="text-muted-foreground font-normal normal-case text-xs">
-                    · {lang === "en" ? "Next" : "اگلا"}: {nextSurah.en}
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-1.5 items-end">
-                <select
-                  value={logSurah}
-                  onChange={(e) => {
-                    const v = Number(e.target.value);
-                    setLogSurah(v);
-                    const s = SURAHS.find((x) => x.n === v);
-                    if (s) {
-                      const newTo = readToEnd ? s.verses : Math.min(logTo, s.verses);
-                      setLogTo(newTo);
-                    }
-                  }}
-                  className="flex-1 min-w-[120px] px-2 py-2 sm:py-1.5 rounded-lg border border-gold/40 bg-background text-sm sm:text-xs"
-                >
-                  {cycleSurahs.map((s) => {
-                    const done = completedInCycle.includes(s.n);
-                    return (
-                      <option key={s.n} value={s.n} className={done ? "text-muted-foreground" : ""}>
-                        {done ? "✓ " : ""}
-                        {s.n}. {s.en}
-                      </option>
-                    );
-                  })}
-                </select>
-                <NumInput
-                  value={logFrom}
-                  onChange={setLogFrom}
-                  min={1}
-                  max={SURAHS.find((s) => s.n === logSurah)?.verses || 300}
-                  className="w-16 sm:w-14 px-1.5 sm:px-1 py-2 sm:py-1.5 rounded-lg border border-gold/40 bg-background text-sm sm:text-xs text-center h-auto shadow-none"
-                />
-                <span className="text-sm sm:text-xs text-muted-foreground">–</span>
-                <NumInput
-                  value={readToEnd ? SURAHS.find((s) => s.n === logSurah)?.verses || logTo : logTo}
-                  min={logFrom}
-                  max={SURAHS.find((s) => s.n === logSurah)?.verses || 300}
-                  disabled={readToEnd}
-                  onChange={setLogTo}
-                  className={cn(
-                    "w-16 sm:w-14 px-1.5 sm:px-1 py-2 sm:py-1.5 rounded-lg border border-gold/40 bg-background text-sm sm:text-xs text-center h-auto shadow-none",
-                    readToEnd && "opacity-50",
-                  )}
-                />
-                <button
-                  onClick={() => setReadToEnd(!readToEnd)}
-                  className={cn(
-                    "h-10 sm:h-9 text-xs px-3 sm:px-2.5 rounded font-semibold border transition-all",
-                    readToEnd
-                      ? "bg-emerald-gradient text-gold border-gold"
-                      : "bg-background text-muted-foreground border-border",
-                  )}
-                >
-                  {readToEnd ? "End" : "Cstm"}
-                </button>
-                <button
-                  onClick={addLogItem}
-                  className="h-10 sm:h-9 w-10 sm:w-9 rounded-lg bg-emerald-gradient text-gold grid place-items-center border border-gold/40 shrink-0"
-                >
-                  <Plus className="h-4 sm:h-3.5 w-4 sm:w-3.5" />
-                </button>
-              </div>
-              {/* Next surah hint if current surah is completed in progress */}
-              {nextSurah && logSurah !== nextSurah.n && (
-                <div className="mt-1.5 sm:mt-1 text-xs text-muted-foreground flex items-center gap-1">
-                  <ArrowRight className="h-3 sm:h-2.5 w-3 sm:w-2.5 text-gold" />
-                  {lang === "en"
-                    ? "Done with this surah? Log it and we'll auto-advance to"
-                    : "یہ سورہ مکمل؟ لاگ کریں، اگلی سورہ"}{" "}
-                  <span className="font-medium text-foreground">{nextSurah.en}</span>
-                </div>
-              )}
-              {readingLog.length > 0 && (
-                <div className="mt-2 space-y-1 max-h-28 overflow-y-auto">
-                  {readingLog.map((x) => {
-                    const s = SURAHS.find((s) => s.n === x.surahN);
-                    const maxV = s?.verses || 0;
-                    const isFull = x.from === 1 && x.to === maxV;
-                    return (
-                      <div
-                        key={x.id}
-                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-background border border-border text-xs"
-                      >
-                        <button
-                          onClick={() => toggleLogItem(x.id)}
-                          className={cn(
-                            "h-3.5 w-3.5 rounded border-2 grid place-items-center shrink-0",
-                            x.checked
-                              ? "bg-emerald-deep border-emerald-deep text-white"
-                              : "border-muted-foreground",
-                          )}
-                        >
-                          {x.checked && <Check className="h-2.5 w-2.5 stroke-[3]" />}
-                        </button>
-                        <span
-                          className={cn(
-                            "flex-1 truncate",
-                            !x.checked && "line-through text-muted-foreground",
-                          )}
-                        >
-                          {s?.en} ({x.from}–{x.to}){isFull ? " ✓" : ""}
-                        </span>
-                        <button
-                          onClick={() => removeLogItem(x.id)}
-                          className="text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Controls */}
-            <div className="flex justify-center gap-2.5 pt-2">
-              <Button
-                onClick={pause}
-                className="bg-gold-gradient text-emerald-deep border border-gold/40 h-10 sm:h-9 text-sm sm:text-xs px-4 sm:px-3"
-              >
-                <Pause className="h-4 sm:h-3.5 w-4 sm:w-3.5" /> {lang === "en" ? "Pause" : "روکیں"}
-              </Button>
-              <Button
-                onClick={() => setShowQA((s) => !s)}
-                className={cn(
-                  "h-10 sm:h-9 text-sm sm:text-xs border border-gold/40 px-4 sm:px-3",
-                  showQA ? "bg-emerald-gradient text-gold" : "bg-background text-muted-foreground",
-                )}
-              >
-                <MessageCircle className="h-4 sm:h-3.5 w-4 sm:w-3.5" /> QA
-              </Button>
-              <Button
-                onClick={() => reset()}
-                variant="outline"
-                className="border-gold/40 h-10 sm:h-9 text-sm sm:text-xs px-4 sm:px-3"
-              >
-                <RotateCcw className="h-4 sm:h-3.5 w-4 sm:w-3.5" />{" "}
-                {lang === "en" ? "Reset" : "دوبارہ"}
-              </Button>
-            </div>
-            <div className="flex justify-center pt-2">
-              <Button
-                onClick={openEndDialog}
-                variant="outline"
-                className="border-destructive/60 text-destructive hover:bg-destructive/10 h-10 sm:h-9 text-xs px-4 sm:px-3"
-              >
-                <StopCircle className="h-4 sm:h-3.5 w-4 sm:w-3.5" />{" "}
-                {lang === "en" ? "End Session" : "نشست ختم کریں"}
-              </Button>
-            </div>
-
-            {/* Deferred questions */}
-            {showQA && (
-              <div className="pt-4 border-t border-border space-y-3">
-                <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground font-semibold">
-                  <ListPlus className="h-3.5 w-3.5" />{" "}
-                  {lang === "en" ? "Defer Question" : "سوال مؤخر کریں"}
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    value={qaQuestion}
-                    onChange={(e) => setQaQuestion(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addQaDeferred()}
-                    placeholder={lang === "en" ? "Type a question..." : "سوال درج کریں..."}
-                    className="border-gold/40 h-10 text-sm"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={addQaDeferred}
-                    className="bg-emerald-gradient text-gold border border-gold/40 shrink-0 h-10"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="space-y-1 max-h-28 overflow-y-auto">
-                  {qaDeferred.length === 0 && (
-                    <p className="text-xs text-muted-foreground text-center py-1">
-                      {lang === "en" ? "No deferred questions." : "کوئی مؤخر سوال نہیں۔"}
-                    </p>
-                  )}
-                  {qaDeferred.map((q) => (
-                    <div
-                      key={q.id}
-                      className="flex items-start justify-between gap-2 p-2 rounded-lg bg-background border border-border"
-                    >
-                      <span className="text-sm">{q.text}</span>
-                      <button
-                        onClick={() => setQaDeferred((d) => d.filter((x) => x.id !== q.id))}
-                        className="shrink-0 text-muted-foreground hover:text-destructive"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </>
+          </>
         )}
 
         {/* ========== DONE STATE ========== */}

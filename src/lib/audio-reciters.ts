@@ -1,5 +1,11 @@
 export type ReciterId =
-  "alafasy" | "sudais" | "abdulbasit" | "husary" | "hudhaify" | "ayyoub" | "jibreel";
+  | "alafasy"
+  | "sudais"
+  | "abdulbasit"
+  | "husary"
+  | "hudhaify"
+  | "ayyoub"
+  | "jibreel";
 
 export type Reciter = {
   id: ReciterId;

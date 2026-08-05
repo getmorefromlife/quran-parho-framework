@@ -48,7 +48,10 @@ export function SurahExplorer({ onOpenSurah }: { onOpenSurah: (n: number) => voi
   }, [mode, q, typeFilter, letter]);
 
   return (
-    <section id="explorer" className="py-20 lg:py-28 bg-card/40 border-y border-border relative overflow-hidden">
+    <section
+      id="explorer"
+      className="py-20 lg:py-28 bg-card/40 border-y border-border relative overflow-hidden"
+    >
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gold/10 rounded-full blur-3xl pointer-events-none" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
         <div className="text-center max-w-2xl mx-auto space-y-3">
