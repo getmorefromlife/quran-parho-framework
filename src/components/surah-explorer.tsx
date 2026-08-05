@@ -12,7 +12,8 @@ export function SurahExplorer({ onOpenSurah }: { onOpenSurah: (n: number) => voi
   const [mode, setMode] = useState<"reverse" | "nuzul" | "mushaf">("mushaf");
   const [q, setQ] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "meccan" | "medinan">("all");
-  const [letter, setLetter] = useState("");
+  const [lengthFilter, setLengthFilter] = useState<"all" | "long" | "medium" | "short">("all");
+  const [juzFilter, setJuzFilter] = useState<string>("all");
   const [bookmark, setBookmark] = useState<ReaderBookmark | null>(() => loadReaderBookmark());
 
   useEffect(() => {
@@ -20,14 +21,6 @@ export function SurahExplorer({ onOpenSurah }: { onOpenSurah: (n: number) => voi
     window.addEventListener("qp-bookmark", refresh);
     return () => window.removeEventListener("qp-bookmark", refresh);
   }, []);
-
-  const letters = useMemo(
-    () =>
-      SURAHS.map((s) => s.en[0].toUpperCase())
-        .filter((v, i, a) => a.indexOf(v) === i)
-        .sort(),
-    [],
-  );
 
   const sorted = useMemo(() => {
     const arr = SURAHS.filter((s) => {
@@ -38,14 +31,27 @@ export function SurahExplorer({ onOpenSurah }: { onOpenSurah: (n: number) => voi
         !String(s.n).includes(q)
       )
         return false;
-      if (letter && s.en[0].toUpperCase() !== letter) return false;
+
       if (typeFilter !== "all" && s.type !== typeFilter) return false;
+
+      if (lengthFilter === "long" && s.verses <= 100) return false;
+      if (lengthFilter === "medium" && (s.verses < 30 || s.verses > 100)) return false;
+      if (lengthFilter === "short" && s.verses >= 30) return false;
+
+      if (juzFilter === "juz30" && (s.n < 78 || s.n > 114)) return false;
+      if (juzFilter === "juz29" && (s.n < 67 || s.n > 77)) return false;
+      if (juzFilter === "juz28" && (s.n < 58 || s.n > 66)) return false;
+      if (juzFilter === "juz1_10" && s.n > 9) return false;
+      if (juzFilter === "juz11_20" && (s.n < 10 || s.n > 29)) return false;
+      if (juzFilter === "juz21_30" && s.n < 30) return false;
+
       return true;
     });
+
     if (mode === "mushaf") return [...arr].sort((a, b) => a.n - b.n);
     if (mode === "reverse") return [...arr].sort((a, b) => b.n - a.n);
     return [...arr].sort((a, b) => a.nuzul - b.nuzul);
-  }, [mode, q, typeFilter, letter]);
+  }, [mode, q, typeFilter, lengthFilter, juzFilter]);
 
   return (
     <section
@@ -83,38 +89,43 @@ export function SurahExplorer({ onOpenSurah }: { onOpenSurah: (n: number) => voi
         )}
 
         <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
+          {/* Order Selector */}
           <div className="inline-flex rounded-full border border-gold/40 bg-card p-1 shadow-sm">
             {(["reverse", "nuzul", "mushaf"] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
                 className={cn(
-                  "px-3 py-1 text-xs font-semibold rounded-full transition-all",
+                  "px-3 py-1 text-xs font-semibold rounded-full transition-all cursor-pointer",
                   mode === m
                     ? "bg-emerald-gradient text-gold shadow-gold"
-                    : "text-muted-foreground",
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {tr(m)}
               </button>
             ))}
           </div>
+
+          {/* Revelation Location Filter */}
           <div className="inline-flex rounded-full border border-gold/40 bg-card p-1 shadow-sm">
             {(["all", "meccan", "medinan"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTypeFilter(t)}
                 className={cn(
-                  "px-3 py-1 text-xs font-semibold rounded-full transition-all",
+                  "px-3 py-1 text-xs font-semibold rounded-full transition-all cursor-pointer",
                   typeFilter === t
                     ? "bg-emerald-gradient text-gold shadow-gold"
-                    : "text-muted-foreground",
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {tr(t)}
               </button>
             ))}
           </div>
+
+          {/* Search Box */}
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
@@ -126,32 +137,62 @@ export function SurahExplorer({ onOpenSurah }: { onOpenSurah: (n: number) => voi
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-1 justify-center">
-          <button
-            onClick={() => setLetter("")}
-            className={cn(
-              "px-2.5 py-1 text-xs font-semibold rounded-full transition-all",
-              !letter
-                ? "bg-emerald-gradient text-gold shadow-gold"
-                : "text-muted-foreground bg-card border border-border",
-            )}
-          >
-            {lang === "en" ? "All" : "تمام"}
-          </button>
-          {letters.map((l) => (
-            <button
-              key={l}
-              onClick={() => setLetter(l)}
-              className={cn(
-                "w-7 h-7 text-xs font-bold rounded-full transition-all",
-                letter === l
-                  ? "bg-emerald-gradient text-gold shadow-gold"
-                  : "text-muted-foreground bg-card border border-border hover:border-gold/40",
-              )}
-            >
-              {l}
-            </button>
-          ))}
+        {/* ── Practical Juz & Length Quick-Filter Row ── */}
+        <div className="mt-4 flex flex-wrap gap-2 items-center justify-center">
+          {/* Juz / Para Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1.5 bg-card/80 border border-gold/30 rounded-2xl p-1.5 shadow-sm">
+            <span className="text-[11px] font-bold text-gold px-2">
+              {lang === "en" ? "Juz / Para:" : "پارہ:"}
+            </span>
+            {[
+              { id: "all", label_en: "All Juz", label_ur: "تمام پارے" },
+              { id: "juz30", label_en: "Juz 30 (Amma)", label_ur: "پارہ 30 (عمّ)" },
+              { id: "juz29", label_en: "Juz 29 (Tabarak)", label_ur: "پارہ 29 (تبارک)" },
+              { id: "juz28", label_en: "Juz 28", label_ur: "پارہ 28" },
+              { id: "juz1_10", label_en: "Juz 1–10", label_ur: "پارہ 1-10" },
+              { id: "juz11_20", label_en: "Juz 11–20", label_ur: "پارہ 11-20" },
+              { id: "juz21_30", label_en: "Juz 21–30", label_ur: "پارہ 21-30" },
+            ].map((j) => (
+              <button
+                key={j.id}
+                onClick={() => setJuzFilter(j.id)}
+                className={cn(
+                  "px-2.5 py-1 text-xs font-medium rounded-xl transition-all cursor-pointer",
+                  juzFilter === j.id
+                    ? "bg-gold text-background font-bold shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                )}
+              >
+                {lang === "ur" ? j.label_ur : j.label_en}
+              </button>
+            ))}
+          </div>
+
+          {/* Surah Length Filter Pills */}
+          <div className="flex flex-wrap items-center gap-1.5 bg-card/80 border border-gold/30 rounded-2xl p-1.5 shadow-sm">
+            <span className="text-[11px] font-bold text-gold px-2">
+              {lang === "en" ? "Length:" : "لمبائی:"}
+            </span>
+            {[
+              { id: "all", label_en: "All", label_ur: "تمام" },
+              { id: "long", label_en: "Long (>100v)", label_ur: "طویل" },
+              { id: "medium", label_en: "Medium (30-100v)", label_ur: "متوسط" },
+              { id: "short", label_en: "Short (<30v)", label_ur: "مختصر" },
+            ].map((l) => (
+              <button
+                key={l.id}
+                onClick={() => setLengthFilter(l.id as "all" | "long" | "medium" | "short")}
+                className={cn(
+                  "px-2.5 py-1 text-xs font-medium rounded-xl transition-all cursor-pointer",
+                  lengthFilter === l.id
+                    ? "bg-emerald-500 text-white font-bold shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                )}
+              >
+                {lang === "ur" ? l.label_ur : l.label_en}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="mt-4 text-xs text-muted-foreground text-center">
