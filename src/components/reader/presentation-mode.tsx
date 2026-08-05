@@ -18,11 +18,18 @@ import {
   BookOpen,
   Columns,
   Monitor,
+  BookOpenText,
+  Languages,
+  Clock,
+  MessageSquare,
+  Hourglass,
+  RotateCcw,
 } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { QVerse } from "@/lib/quran-data";
+import { getFontFamily, type ReaderPrefs } from "@/lib/reader-fonts";
 
 export type PresentationModeProps = {
   surahN: number;
@@ -40,28 +47,54 @@ export type PresentationModeProps = {
   totalTurns?: number;
   turnStartAyah?: number;
   turnEndAyah?: number;
+  prefs?: ReaderPrefs;
 };
 
-type ThemeStyle = "emerald" | "midnight" | "oled";
+type ThemeStyle = "light" | "parchment" | "emerald" | "midnight" | "oled";
 
-const THEMES: Record<ThemeStyle, { bg: string; text: string; gold: string; border: string }> = {
+const THEMES: Record<
+  ThemeStyle,
+  { bg: string; text: string; gold: string; border: string; cardBg: string; isLight: boolean }
+> = {
+  light: {
+    bg: "bg-slate-100",
+    text: "text-slate-900",
+    gold: "text-amber-800",
+    border: "border-slate-300",
+    cardBg: "bg-white/90",
+    isLight: true,
+  },
+  parchment: {
+    bg: "bg-[#f5efdf]",
+    text: "text-[#2a2118]",
+    gold: "text-amber-900",
+    border: "border-[#dfd3b9]",
+    cardBg: "bg-[#ebdcb9]/80",
+    isLight: true,
+  },
   emerald: {
     bg: "bg-emerald-950",
     text: "text-emerald-50",
     gold: "text-amber-400",
     border: "border-emerald-800/60",
+    cardBg: "bg-zinc-900/60",
+    isLight: false,
   },
   midnight: {
     bg: "bg-slate-950",
     text: "text-slate-100",
     gold: "text-gold",
     border: "border-slate-800/60",
+    cardBg: "bg-zinc-900/60",
+    isLight: false,
   },
   oled: {
     bg: "bg-black",
     text: "text-white",
     gold: "text-yellow-400",
     border: "border-zinc-800",
+    cardBg: "bg-zinc-900/80",
+    isLight: false,
   },
 };
 
@@ -81,16 +114,28 @@ export function PresentationMode({
   totalTurns,
   turnStartAyah,
   turnEndAyah,
+  prefs,
 }: PresentationModeProps) {
   const { lang } = useLang();
 
-  const [fontSizeRem, setFontSizeRem] = useState(3.2); // Default 3.2rem for projector viewing
+  const [fontSizeRem, setFontSizeRem] = useState(3.2);
   const [themeStyle, setThemeStyle] = useState<ThemeStyle>("midnight");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showPrompts, setShowPrompts] = useState(false);
 
-  // Turn timer state (5-minute countdown per turn)
-  const [timerSeconds, setTimerSeconds] = useState(300);
+  // Content Display Mode: both (Arabic+Translation) | translation_only | arabic_only
+  const [contentMode, setContentMode] = useState<"both" | "translation_only" | "arabic_only">(
+    "both",
+  );
+
+  // Live Session & Q&A Timers
+  const [sessionTimer, setSessionTimer] = useState(3600); // 60 minutes
+  const [sessionActive, setSessionActive] = useState(false);
+
+  const [qaTimer, setQaTimer] = useState(900); // 15 minutes
+  const [qaActive, setQaActive] = useState(false);
+
+  const [timerSeconds, setTimerSeconds] = useState(300); // 5-min turn timer
   const [timerActive, setTimerActive] = useState(false);
 
   const [viewMode, setViewMode] = useState<"turn_block" | "single_verse">("turn_block");
@@ -157,7 +202,23 @@ export function PresentationMode({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleNext, handlePrev, onClose]);
 
-  // Turn timer interval
+  // Timers countdown intervals
+  useEffect(() => {
+    if (!sessionActive) return;
+    const interval = setInterval(() => {
+      setSessionTimer((sec) => (sec > 0 ? sec - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [sessionActive]);
+
+  useEffect(() => {
+    if (!qaActive) return;
+    const interval = setInterval(() => {
+      setQaTimer((sec) => (sec > 0 ? sec - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [qaActive]);
+
   useEffect(() => {
     if (!timerActive) return;
     const interval = setInterval(() => {
@@ -214,28 +275,128 @@ export function PresentationMode({
           )}
         </div>
 
-        {/* Right: Projector Controls */}
-        <div className="flex items-center gap-2">
-          {/* Pace Timer Button */}
-          <button
-            onClick={() => {
-              setTimerActive((v) => !v);
-              if (!timerActive && timerSeconds === 0) setTimerSeconds(300);
-            }}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-all cursor-pointer",
-              timerActive
-                ? "border-amber-400 bg-amber-400/20 text-amber-300 animate-pulse"
-                : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-zinc-200",
-            )}
-            title="5-Minute Turn Pace Timer"
-          >
-            <Timer className="h-3.5 w-3.5" />
-            <span>{formatTimer(timerSeconds)}</span>
-          </button>
+        {/* Right: Projector Controls & Prominent Timers */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Prominent Timers Bar */}
+          <div className="flex items-center bg-zinc-900/90 border border-zinc-800 rounded-xl p-1 gap-1">
+            {/* Session Timer (60m) */}
+            <button
+              onClick={() => {
+                setSessionActive((v) => !v);
+                if (!sessionActive && sessionTimer === 0) setSessionTimer(3600);
+              }}
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer",
+                sessionActive
+                  ? "bg-amber-500 text-black shadow-sm"
+                  : "text-zinc-300 hover:text-white",
+              )}
+              title="1-Hour Session Timer (Click to Play/Pause)"
+            >
+              <Clock className="h-3.5 w-3.5" />
+              <span>{formatTimer(sessionTimer)}</span>
+            </button>
 
-          {/* Theme Selector */}
+            {/* Q&A Timer (15m) */}
+            <button
+              onClick={() => {
+                setQaActive((v) => !v);
+                if (!qaActive && qaTimer === 0) setQaTimer(900);
+              }}
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer",
+                qaActive ? "bg-blue-500 text-white shadow-sm" : "text-zinc-300 hover:text-white",
+              )}
+              title="Circle Q&A Timer (Click to Play/Pause)"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              <span>Q&A: {formatTimer(qaTimer)}</span>
+            </button>
+
+            {/* Turn Pace Timer (5m) */}
+            <button
+              onClick={() => {
+                setTimerActive((v) => !v);
+                if (!timerActive && timerSeconds === 0) setTimerSeconds(300);
+              }}
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer",
+                timerActive
+                  ? "bg-emerald-500 text-white shadow-sm"
+                  : "text-zinc-300 hover:text-white",
+              )}
+              title="5-Minute Turn Pace Timer"
+            >
+              <Hourglass className="h-3.5 w-3.5" />
+              <span>Turn: {formatTimer(timerSeconds)}</span>
+            </button>
+          </div>
+
+          {/* Content Mode Switcher (Both vs Translation Only vs Arabic Only) */}
           <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
+            <button
+              onClick={() => setContentMode("both")}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                contentMode === "both"
+                  ? "bg-amber-500 text-black shadow-sm"
+                  : "text-zinc-400 hover:text-white",
+              )}
+              title="Show Arabic & Translation"
+            >
+              <Languages className="h-3.5 w-3.5" />
+              <span className="hidden xl:inline">Both</span>
+            </button>
+            <button
+              onClick={() => setContentMode("translation_only")}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                contentMode === "translation_only"
+                  ? "bg-amber-500 text-black shadow-sm"
+                  : "text-zinc-400 hover:text-white",
+              )}
+              title="Translation Only View (Focus on Understanding)"
+            >
+              <BookOpenText className="h-3.5 w-3.5" />
+              <span className="hidden xl:inline">Translation Only</span>
+            </button>
+            <button
+              onClick={() => setContentMode("arabic_only")}
+              className={cn(
+                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                contentMode === "arabic_only"
+                  ? "bg-amber-500 text-black shadow-sm"
+                  : "text-zinc-400 hover:text-white",
+              )}
+              title="Arabic Only View"
+            >
+              <Type className="h-3.5 w-3.5" />
+              <span className="hidden xl:inline">Arabic Only</span>
+            </button>
+          </div>
+
+          {/* Theme Selector: Light | Parchment | Emerald | Midnight | OLED */}
+          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
+            <button
+              onClick={() => setThemeStyle("light")}
+              className={cn(
+                "w-6 h-6 rounded-lg bg-slate-100 border transition-all cursor-pointer",
+                themeStyle === "light"
+                  ? "border-amber-600 ring-1 ring-amber-600"
+                  : "border-slate-300",
+              )}
+              title="Light Clean Theme"
+            />
+            <button
+              onClick={() => setThemeStyle("parchment")}
+              className={cn(
+                "w-6 h-6 rounded-lg bg-[#f5efdf] border transition-all cursor-pointer",
+                themeStyle === "parchment"
+                  ? "border-amber-700 ring-1 ring-amber-700"
+                  : "border-[#dfd3b9]",
+              )}
+              title="Parchment Reading Theme"
+            />
             <button
               onClick={() => setThemeStyle("emerald")}
               className={cn(
@@ -252,7 +413,7 @@ export function PresentationMode({
                 "w-6 h-6 rounded-lg bg-slate-900 border transition-all cursor-pointer",
                 themeStyle === "midnight" ? "border-gold ring-1 ring-gold" : "border-slate-700",
               )}
-              title="Midnight Theme"
+              title="Midnight Dark Theme"
             />
             <button
               onClick={() => setThemeStyle("oled")}
@@ -414,7 +575,7 @@ export function PresentationMode({
       )}
 
       {/* ── Main Presentation Stage ── */}
-      <div className="flex-1 flex items-center justify-center px-4 sm:px-8 py-4 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-8 pt-8 sm:pt-10 pb-16">
         <div
           className={cn(
             "mx-auto w-full text-center space-y-6 transition-all duration-300",
@@ -451,52 +612,91 @@ export function PresentationMode({
                     className={cn(
                       "p-4 sm:p-5 rounded-2xl border transition-all",
                       currentTheme.border,
-                      "bg-zinc-900/60 backdrop-blur-sm shadow-md",
+                      currentTheme.cardBg,
+                      "backdrop-blur-sm shadow-md",
                     )}
                   >
-                    {layoutWidth === "wide" ? (
-                      /* Wide 2-Column Layout for HD Screens */
-                      <div className="grid md:grid-cols-12 gap-4 items-center">
-                        {/* Ayah Number Badge */}
-                        <div className="md:col-span-1 flex items-center justify-center">
-                          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-amber-400/40 bg-zinc-950 text-sm font-bold text-amber-400 shadow-sm">
+                    {contentMode === "translation_only" ? (
+                      /* Translation-Only Focus Mode */
+                      <div className="space-y-3 text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-amber-400/40 bg-zinc-950 text-sm font-bold text-amber-400">
                             {v.ayah}
                           </span>
+                          <span className="text-[10px] uppercase font-bold text-amber-500/80 tracking-wider">
+                            {lang === "ur" ? "ترجمہ فہم موڈ" : "Translation Focus"}
+                          </span>
                         </div>
-
-                        {/* Arabic Text (Right Side) */}
-                        <div className="md:col-span-6">
+                        {v.english_qarai && (
+                          <p className="text-lg sm:text-xl lg:text-2xl font-serif leading-relaxed text-zinc-100">
+                            "{v.english_qarai}"
+                          </p>
+                        )}
+                        {v.urdu_jawadi && (
                           <p
                             dir="rtl"
-                            className={cn(
-                              "font-arabic font-semibold leading-relaxed tracking-wide text-right",
-                              currentTheme.gold,
-                            )}
-                            style={{ fontSize: `${fontSizeRem * 0.75}rem` }}
+                            className="text-lg sm:text-xl lg:text-2xl font-arabic leading-relaxed text-amber-200/95 text-right pt-1"
                           >
-                            {v.arabic}
+                            "{v.urdu_jawadi}"
                           </p>
-                        </div>
-
-                        {/* Translations (Left Side) */}
-                        <div className="md:col-span-5 space-y-1.5 text-left border-l md:border-l-0 border-zinc-800/60 pl-3 md:pl-0">
+                        )}
+                      </div>
+                    ) : contentMode === "arabic_only" ? (
+                      /* Arabic-Only Calligraphy Mode */
+                      <div className="flex items-start justify-between gap-4">
+                        <span className="inline-flex align-middle h-8 w-8 items-center justify-center rounded-full border border-amber-400/40 bg-zinc-950 text-sm font-bold text-amber-400 shrink-0">
+                          {v.ayah}
+                        </span>
+                        <p
+                          dir="rtl"
+                          className={cn(
+                            "font-arabic font-semibold leading-relaxed tracking-wide text-right flex-1",
+                            currentTheme.gold,
+                          )}
+                          style={{ fontSize: `${fontSizeRem * 0.9}rem` }}
+                        >
+                          {v.arabic}
+                        </p>
+                      </div>
+                    ) : layoutWidth === "wide" ? (
+                      /* Both (Wide 2-Column Layout): Left = Translations | Right = Arabic */
+                      <div className="grid md:grid-cols-12 gap-6 items-center">
+                        {/* Left Side (Cols 1 to 6): English & Urdu Translations */}
+                        <div className="md:col-span-6 space-y-2 text-left order-2 md:order-1">
                           {v.english_qarai && (
-                            <p className="text-base sm:text-lg font-serif text-zinc-200 leading-snug">
+                            <p className="text-base sm:text-lg lg:text-xl font-serif text-zinc-200 leading-relaxed">
                               "{v.english_qarai}"
                             </p>
                           )}
                           {v.urdu_jawadi && (
                             <p
                               dir="rtl"
-                              className="text-base sm:text-lg font-arabic text-amber-200/90 leading-snug text-right"
+                              className="text-base sm:text-lg lg:text-xl font-arabic text-amber-200/90 leading-relaxed text-right"
                             >
                               "{v.urdu_jawadi}"
                             </p>
                           )}
                         </div>
+
+                        {/* Right Side (Cols 7 to 12): Arabic Calligraphy & Ayah Number */}
+                        <div className="md:col-span-6 flex items-start justify-end gap-4 order-1 md:order-2">
+                          <p
+                            dir="rtl"
+                            className={cn(
+                              "font-arabic font-semibold leading-relaxed tracking-wide text-right flex-1",
+                              currentTheme.gold,
+                            )}
+                            style={{ fontSize: `${fontSizeRem * 0.85}rem` }}
+                          >
+                            {v.arabic}
+                          </p>
+                          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-amber-400/40 bg-zinc-950 text-sm font-bold text-amber-400 shrink-0">
+                            {v.ayah}
+                          </span>
+                        </div>
                       </div>
                     ) : (
-                      /* Standard Stacked Layout */
+                      /* Both (Standard Stacked Layout) */
                       <div className="space-y-3">
                         <div className="flex items-start justify-between gap-4">
                           <span className="inline-flex align-middle h-8 w-8 items-center justify-center rounded-full border border-amber-400/40 bg-zinc-950 text-sm font-bold text-amber-400 shrink-0">

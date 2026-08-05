@@ -955,6 +955,7 @@ export function SurahReader({
           totalTurns={prefs.circleModeEnabled ? totalTurns : undefined}
           turnStartAyah={prefs.circleModeEnabled ? turnStartAyah : undefined}
           turnEndAyah={prefs.circleModeEnabled ? turnEndAyah : undefined}
+          prefs={prefs}
         />
       )}
 

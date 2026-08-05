@@ -39,7 +39,7 @@ export function HifzControls({ prefs, onChange, repeatIndex, onClose }: HifzCont
   const targetRepeats = isInfinite ? "∞" : prefs.verseRepeatCount;
 
   return (
-    <div className="bg-card/95 border-b border-gold/30 backdrop-blur-xl px-4 py-2.5 shadow-gold relative z-[94]">
+    <div className="sticky top-[57px] bg-card/95 border-b border-gold/30 backdrop-blur-xl px-4 py-2.5 shadow-gold z-[9]">
       <div className="max-w-4xl mx-auto flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
         {/* Left: Hifz Badge & Active Loop Counter */}
         <div className="flex items-center gap-2.5 min-w-0">
