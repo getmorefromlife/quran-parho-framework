@@ -76,7 +76,7 @@ export function SessionGuide({
           <Badge className="bg-emerald-deep/10 text-emerald-deep border-emerald-deep/30 px-3">
             <Play className="h-3.5 w-3.5" /> {lang === "en" ? "Session Guide" : "نشست کا طریقہ"}
           </Badge>
-          <h2 className="mt-4 text-3xl sm:text-4xl font-bold">{tr("guide_title")}</h2>
+          <h2 className={cn("mt-4 text-3xl sm:text-4xl font-bold", lang === "ur" && "mt-8")}>{tr("guide_title")}</h2>
           <p className="mt-3 text-muted-foreground">{tr("guide_sub")}</p>
         </div>
 

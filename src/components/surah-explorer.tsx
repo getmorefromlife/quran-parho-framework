@@ -54,7 +54,7 @@ export function SurahExplorer({ onOpenSurah }: { onOpenSurah: (n: number) => voi
     >
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gold/10 rounded-full blur-3xl pointer-events-none" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
-        <div className="text-center max-w-2xl mx-auto space-y-3">
+        <div className={cn("text-center max-w-2xl mx-auto", lang === "ur" ? "space-y-5" : "space-y-3")}>
           <Badge className="bg-gold/20 text-gold border border-gold/40 px-4 py-1 text-xs font-semibold uppercase tracking-wider">
             <BookOpen className="h-3.5 w-3.5 mr-1.5 inline" />
             {lang === "en" ? "Interactive Qurʼān Explorer" : "قرآنی سورتوں کا ایکسپلورر"}
