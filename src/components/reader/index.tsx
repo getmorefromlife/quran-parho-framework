@@ -616,6 +616,21 @@ export function SurahReader({
       {/* Top bar */}
       <div className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur-xl">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-2">
+          {/* Main Website Branding Link (Top Left) */}
+          <button
+            type="button"
+            onClick={onClose}
+            title={lang === "en" ? "Back to Main Website" : "مرکزی ویب سائٹ پر واپس جائیں"}
+            className="group flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-gold/30 bg-card/80 hover:bg-gold/10 hover:border-gold/60 text-foreground transition-all shrink-0 cursor-pointer"
+          >
+            <div className="grid h-6 w-6 place-items-center rounded-lg bg-card ring-1 ring-gold/20 shadow-sm overflow-hidden shrink-0">
+              <img src="/logo.png" alt="Qurʼān Parho" className="h-5 w-5 object-contain" />
+            </div>
+            <span className="hidden sm:inline font-semibold text-xs tracking-tight text-foreground group-hover:text-gold transition-colors">
+              {lang === "en" ? "Qurʼān Parho" : "قرآن پڑھو"}
+            </span>
+          </button>
+
           <button
             type="button"
             onClick={() => onNavigate(surahN - 1)}
@@ -1390,13 +1405,29 @@ export function SurahReader({
         <div className="fixed inset-0 z-[90] bg-background overflow-y-auto">
           <div className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur-xl">
             <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => setShowSavedPanel(false)}
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:border-gold/60 transition-colors"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  title={lang === "en" ? "Back to Main Website" : "مرکزی ویب سائٹ پر واپس جائیں"}
+                  className="group flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-gold/30 bg-card/80 hover:bg-gold/10 hover:border-gold/60 text-foreground transition-all shrink-0 cursor-pointer"
+                >
+                  <div className="grid h-6 w-6 place-items-center rounded-lg bg-card ring-1 ring-gold/20 shadow-sm overflow-hidden shrink-0">
+                    <img src="/logo.png" alt="Qurʼān Parho" className="h-5 w-5 object-contain" />
+                  </div>
+                  <span className="hidden sm:inline font-semibold text-xs tracking-tight text-foreground group-hover:text-gold transition-colors">
+                    {lang === "en" ? "Qurʼān Parho" : "قرآن پڑھو"}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSavedPanel(false)}
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:border-gold/60 transition-colors"
+                  title={lang === "en" ? "Back to Reader" : "قاری کی طرف واپس"}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              </div>
               <div className="flex-1 text-center text-sm font-semibold truncate">
                 {lang === "en" ? "Saved Research & Library" : "محفوظ تحقیقی لائبریری"}
               </div>
