@@ -279,7 +279,12 @@ export function PresentationMode({
     </p>
   );
 
-  const singleTrans = activeVerse ? renderTrans(activeVerse, { ltr: 1.25, rtl: 1.3 }) : [];
+  const singleTrans = activeVerse
+    ? renderTrans(
+        activeVerse,
+        contentMode === "translation_only" ? { ltr: 1.5, rtl: 1.6 } : { ltr: 1.25, rtl: 1.3 },
+      )
+    : [];
 
   // Fullscreen helper
   const toggleFullscreen = () => {
@@ -978,28 +983,53 @@ export function PresentationMode({
                 </Button>
               </div>
 
-              {/* Ultra-Large Arabic Text with Ayah Number */}
-              {activeVerse && renderArabic(activeVerse, fontSizeRem)}
+              {contentMode === "arabic_only" ? (
+                /* Ultra-Large Arabic Text with Ayah Number */
+                activeVerse && renderArabic(activeVerse, fontSizeRem)
+              ) : contentMode === "translation_only" ? (
+                /* Translation-Only Focus Mode */
+                activeVerse && (
+                  <div dir={stageDir} className="space-y-4 max-w-4xl mx-auto">
+                    {singleTrans.length ? (
+                      singleTrans
+                    ) : (
+                      <p
+                        className={cn(
+                          "text-lg italic opacity-60 text-center",
+                          currentTheme.transText,
+                        )}
+                      >
+                        {tr("present_no_translation")}
+                      </p>
+                    )}
+                  </div>
+                )
+              ) : (
+                <>
+                  {/* Ultra-Large Arabic Text with Ayah Number */}
+                  {activeVerse && renderArabic(activeVerse, fontSizeRem)}
 
-              {/* Translations */}
-              {activeVerse && (
-                <div
-                  dir={stageDir}
-                  className="space-y-4 max-w-4xl mx-auto pt-4 border-t border-zinc-800/60"
-                >
-                  {singleTrans.length ? (
-                    singleTrans
-                  ) : (
-                    <p
-                      className={cn(
-                        "text-lg italic opacity-60 text-center",
-                        currentTheme.transText,
-                      )}
+                  {/* Translations */}
+                  {activeVerse && (
+                    <div
+                      dir={stageDir}
+                      className="space-y-4 max-w-4xl mx-auto pt-4 border-t border-zinc-800/60"
                     >
-                      {tr("present_no_translation")}
-                    </p>
+                      {singleTrans.length ? (
+                        singleTrans
+                      ) : (
+                        <p
+                          className={cn(
+                            "text-lg italic opacity-60 text-center",
+                            currentTheme.transText,
+                          )}
+                        >
+                          {tr("present_no_translation")}
+                        </p>
+                      )}
+                    </div>
                   )}
-                </div>
+                </>
               )}
             </>
           )}
