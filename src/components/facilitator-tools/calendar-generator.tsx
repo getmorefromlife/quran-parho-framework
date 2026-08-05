@@ -24,6 +24,7 @@ export function CalendarGenerator({ lang }: { lang: string }) {
         surahs: [...all].sort((a, b) => a.n - b.n),
       },
     ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [lang],
   );
 

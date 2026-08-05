@@ -194,6 +194,7 @@ export function SessionPhaseTimer({
         return next;
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
   // Cycle integration
@@ -217,9 +218,10 @@ export function SessionPhaseTimer({
     if (cycleIdx === 0) return [...allSurahs].sort((a, b) => b.n - a.n);
     if (cycleIdx === 1) return [...allSurahs].sort((a, b) => a.nuzul - b.nuzul);
     return [...allSurahs].sort((a, b) => a.n - b.n);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleIdx]);
   const cycleKey = `cycle${cycleIdx + 1}`;
-  const completedInCycle = cycleProgress[cycleKey] || [];
+  const completedInCycle = useMemo(() => cycleProgress[cycleKey] || [], [cycleProgress, cycleKey]);
   const nextSurah = useMemo(
     () => cycleSurahs.find((s) => !completedInCycle.includes(s.n)),
     [cycleSurahs, completedInCycle],
@@ -239,6 +241,7 @@ export function SessionPhaseTimer({
         setReadToEnd(true);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleIdx]);
 
   const qaBeep = () => {
@@ -474,6 +477,7 @@ export function SessionPhaseTimer({
   const [editableMsg, setEditableMsg] = useState("");
   useEffect(() => {
     if (phase === "done" && !editableMsg) setEditableMsg(defaultMessage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
   return (

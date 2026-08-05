@@ -43,7 +43,10 @@ export function HowToGuide() {
     <section id="howto" className="py-16 sm:py-24">
       <div className="max-w-5xl mx-auto px-4 sm:px-6">
         <div className="text-center mb-12">
-          <Badge variant="outline" className={cn("border-gold/30 text-gold mb-4", lang === "ur" && "mb-7")}>
+          <Badge
+            variant="outline"
+            className={cn("border-gold/30 text-gold mb-4", lang === "ur" && "mb-7")}
+          >
             {lang === "en" ? "Quick Guide" : "مختصر رہنما"}
           </Badge>
           <h2 className="text-3xl sm:text-4xl font-bold text-foreground">{tr("howto_title")}</h2>
