@@ -25,6 +25,8 @@ export const t: Dict = {
   themes_shia: { en: "Shia Emphasis", ur: "شیعہ مکتبِ فکر" },
   themes_sunni: { en: "Sunni Emphasis", ur: "سنی مکتبِ فکر" },
   themes_open: { en: "Open in Reader", ur: "قاری میں کھولیں" },
+  themes_start_playlist: { en: "Play Theme Playlist", ur: "موضوعاتی پلے لسٹ چلائیں" },
+  playlist_mode: { en: "Theme Playlist Mode", ur: "موضوعاتی پلے لسٹ موڈ" },
   themes_verses: { en: "verses", ur: "آیات" },
   themes_search: { en: "Search themes...", ur: "موضوع تلاش کریں..." },
   themes_all_categories: { en: "All Categories", ur: "تمام زمرے" },

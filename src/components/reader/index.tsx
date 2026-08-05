@@ -70,6 +70,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FloatingSettings, ReaderSettingsPanel } from "@/components/reader/settings-panel";
 import { CircleTurnBar } from "@/components/reader/circle-turn-bar";
+import { ThemePlaylistBar } from "@/components/reader/theme-playlist-bar";
+import { createThemePlaylist, type ThemeEntry, type ThemePlaylistItem } from "@/lib/themes";
 import { cn } from "@/lib/utils";
 
 export type SurahReaderProps = {
@@ -87,6 +89,7 @@ export type SurahReaderProps = {
   onJumpComplete?: () => void;
   initialShowSavedPanel?: boolean;
   initialSavedTab?: "notes" | "highlights" | "favorites" | "searches";
+  initialPlaylistTheme?: ThemeEntry;
 };
 
 export function SurahReader({
@@ -104,6 +107,7 @@ export function SurahReader({
   onJumpComplete,
   initialShowSavedPanel,
   initialSavedTab,
+  initialPlaylistTheme,
 }: SurahReaderProps) {
   const { tr, lang } = useLang();
   const [prefs, setPrefs] = useState<ReaderPrefs>(() => loadReaderPrefs());
@@ -167,6 +171,24 @@ export function SurahReader({
     }
   }, [initialShowSavedPanel, initialSavedTab]);
 
+  // ── Multi-Surah Theme Playlist State ──
+  const [playlistTheme, setPlaylistTheme] = useState<ThemeEntry | null>(
+    () => initialPlaylistTheme || null,
+  );
+  const playlist = useMemo(
+    () => (playlistTheme ? createThemePlaylist(playlistTheme) : []),
+    [playlistTheme],
+  );
+  const [playlistTrackIndex, setPlaylistTrackIndex] = useState(0);
+  const [autoAdvanceAudio, setAutoAdvanceAudio] = useState(true);
+
+  useEffect(() => {
+    if (initialPlaylistTheme) {
+      setPlaylistTheme(initialPlaylistTheme);
+      setPlaylistTrackIndex(0);
+    }
+  }, [initialPlaylistTheme]);
+
   // ── Quran Circle Turn Mode State ──
   const [circleTurn, setCircleTurn] = useState(1);
   const chunkSize = prefs.circleChunkSize || 5;
@@ -228,7 +250,53 @@ export function SurahReader({
     [audioVerse, audioPlaying, playVerse],
   );
 
+  const goToVerse = useCallback(
+    (sN: number, aN: number) => {
+      setShowSavedPanel(false);
+      setSavedSelectMode(false);
+      setSavedSelection(new Set());
+      if (sN === surahN) {
+        const node = verseRefs.current.get(aN);
+        if (node && scrollRef.current) {
+          const top = node.getBoundingClientRect().top + scrollRef.current.scrollTop - 90;
+          scrollRef.current.scrollTo({ top, behavior: "smooth" });
+          setFlash(aN);
+          setSelectedVerse(aN);
+          setTimeout(() => setFlash(null), 3000);
+        }
+      } else {
+        onNavigate(sN, aN);
+      }
+    },
+    [surahN, onNavigate],
+  );
+
+  const handleSelectTrack = useCallback(
+    (index: number, autoPlay = true) => {
+      if (index < 0 || index >= playlist.length) return;
+      setPlaylistTrackIndex(index);
+      const target = playlist[index];
+      if (!target) return;
+
+      goToVerse(target.surah, target.ayah);
+
+      if (autoPlay) {
+        playVerse(target.ayah);
+      }
+    },
+    [playlist, goToVerse, playVerse],
+  );
+
   const handleAudioEnded = useCallback(() => {
+    if (playlistTheme && playlist.length > 0 && autoAdvanceAudio) {
+      if (playlistTrackIndex < playlist.length - 1) {
+        handleSelectTrack(playlistTrackIndex + 1, true);
+        return;
+      }
+      stopAudio();
+      return;
+    }
+
     if (!verses || audioVerse == null) return;
     const idx = verses.findIndex((v) => v.ayah === audioVerse);
     if (idx === -1) return;
@@ -238,7 +306,19 @@ export function SurahReader({
     } else {
       stopAudio();
     }
-  }, [verses, audioVerse, rangeStart, rangeEnd, playVerse, stopAudio]);
+  }, [
+    playlistTheme,
+    playlist,
+    autoAdvanceAudio,
+    playlistTrackIndex,
+    handleSelectTrack,
+    stopAudio,
+    verses,
+    audioVerse,
+    rangeStart,
+    rangeEnd,
+    playVerse,
+  ]);
 
   const handleAudioError = useCallback(() => {
     setAudioError(true);
@@ -447,24 +527,6 @@ export function SurahReader({
     setShowNotePanel(false);
     setSavedSelectMode(false);
     setSavedSelection(new Set());
-  };
-
-  const goToVerse = (sN: number, aN: number) => {
-    setShowSavedPanel(false);
-    setSavedSelectMode(false);
-    setSavedSelection(new Set());
-    if (sN === surahN) {
-      const node = verseRefs.current.get(aN);
-      if (node && scrollRef.current) {
-        const top = node.getBoundingClientRect().top + scrollRef.current.scrollTop - 90;
-        scrollRef.current.scrollTo({ top, behavior: "smooth" });
-        setFlash(aN);
-        setSelectedVerse(aN);
-        setTimeout(() => setFlash(null), 3000);
-      }
-    } else {
-      onNavigate(sN, aN);
-    }
   };
 
   const tabSource = (tab: "notes" | "highlights" | "favorites" | "searches") =>
@@ -760,6 +822,29 @@ export function SurahReader({
           </button>
         </div>
       </div>
+
+      {/* Theme Playlist Mode Bar */}
+      {playlistTheme && playlist.length > 0 && (
+        <ThemePlaylistBar
+          theme={playlistTheme}
+          playlist={playlist}
+          currentIndex={playlistTrackIndex}
+          onSelectTrack={(idx) => handleSelectTrack(idx, true)}
+          onClosePlaylist={() => setPlaylistTheme(null)}
+          autoAdvanceAudio={autoAdvanceAudio}
+          onToggleAutoAdvance={() => setAutoAdvanceAudio((v) => !v)}
+          isPlayingAudio={audioPlaying}
+          onTogglePlayAudio={() => {
+            const currentTrack = playlist[playlistTrackIndex];
+            if (!currentTrack) return;
+            if (audioPlaying) {
+              stopAudio();
+            } else {
+              playVerse(currentTrack.ayah);
+            }
+          }}
+        />
+      )}
 
       {prefs.circleModeEnabled && (
         <CircleTurnBar

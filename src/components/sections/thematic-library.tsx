@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { BookOpen, Search, Filter, Layers, Check, Sparkles } from "lucide-react";
+import { BookOpen, Search, Filter, Layers, Check, Sparkles, Disc } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
 } from "@/lib/themes";
 
 type Props = {
-  onOpenTheme: (theme: ThemeEntry) => void;
+  onOpenTheme: (theme: ThemeEntry, mode?: "playlist" | "project") => void;
 };
 
 export function ThematicLibrary({ onOpenTheme }: Props) {
@@ -271,15 +271,33 @@ export function ThematicLibrary({ onOpenTheme }: Props) {
                       </div>
                     </div>
 
-                    {/* Action Button */}
-                    <Button
-                      onClick={() => onOpenTheme(theme)}
-                      size="sm"
-                      className="bg-emerald-gradient hover:opacity-95 text-white shadow-gold text-xs px-3.5 py-1.5 h-8 gap-1.5 cursor-pointer shrink-0 rounded-xl font-semibold"
-                    >
-                      <BookOpen className="h-3.5 w-3.5 text-gold" />
-                      <span>{lang === "en" ? "Open Project" : "پروجیکٹ میں دیکھیں"}</span>
-                    </Button>
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button
+                        onClick={() => onOpenTheme(theme, "playlist")}
+                        size="sm"
+                        className="bg-emerald-gradient hover:opacity-95 text-white shadow-gold text-xs px-3 py-1.5 h-8 gap-1 cursor-pointer rounded-xl font-semibold"
+                        title={tr("themes_start_playlist")}
+                      >
+                        <Disc
+                          className="h-3.5 w-3.5 text-gold animate-spin"
+                          style={{ animationDuration: "6s" }}
+                        />
+                        <span>{lang === "en" ? "Play Playlist" : "پلے لسٹ"}</span>
+                      </Button>
+                      <Button
+                        onClick={() => onOpenTheme(theme, "project")}
+                        size="sm"
+                        variant="outline"
+                        className="border-border hover:border-gold/60 text-xs px-2.5 py-1.5 h-8 gap-1 cursor-pointer rounded-xl font-semibold"
+                        title={lang === "en" ? "Open Combined Project" : "پروجیکٹ میں دیکھیں"}
+                      >
+                        <BookOpen className="h-3.5 w-3.5 text-gold" />
+                        <span className="hidden sm:inline">
+                          {lang === "en" ? "Project" : "پروجیکٹ"}
+                        </span>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               );

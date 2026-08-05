@@ -79,6 +79,7 @@ function Page() {
     rangeEnd: number;
     initialShowSavedPanel?: boolean;
     initialSavedTab?: "notes" | "highlights" | "favorites" | "searches";
+    initialPlaylistTheme?: ThemeEntry;
   } | null>(null);
   const [readerVerses, setReaderVerses] = useState<QVerse[] | null>(null);
   const [readerError, setReaderError] = useState(false);
@@ -100,6 +101,7 @@ function Page() {
     options?: {
       initialShowSavedPanel?: boolean;
       initialSavedTab?: "notes" | "highlights" | "favorites" | "searches";
+      initialPlaylistTheme?: ThemeEntry;
     },
   ) =>
     setReaderOpen({
@@ -108,6 +110,7 @@ function Page() {
       rangeEnd,
       initialShowSavedPanel: options?.initialShowSavedPanel,
       initialSavedTab: options?.initialSavedTab,
+      initialPlaylistTheme: options?.initialPlaylistTheme,
     });
 
   const [jumpToVerse, setJumpToVerse] = useState<number | undefined>(undefined);
@@ -116,15 +119,21 @@ function Page() {
     setReaderOpen((r) => (r ? { ...r, surahN: n } : r));
   };
 
-  const handleOpenTheme = (theme: ThemeEntry) => {
+  const handleOpenTheme = (theme: ThemeEntry, mode: "playlist" | "project" = "playlist") => {
     getOrCreateThemeProject(theme, lang as "en" | "ur");
     const parsed = parseVerseSpecs(theme.verses);
     if (parsed.length > 0) {
       const first = parsed[0];
-      openReader(first.surah, 1, undefined, {
-        initialShowSavedPanel: true,
-        initialSavedTab: "favorites",
-      });
+      if (mode === "playlist") {
+        openReader(first.surah, 1, undefined, {
+          initialPlaylistTheme: theme,
+        });
+      } else {
+        openReader(first.surah, 1, undefined, {
+          initialShowSavedPanel: true,
+          initialSavedTab: "favorites",
+        });
+      }
       setJumpToVerse(first.ayah);
     }
   };
@@ -221,6 +230,7 @@ function Page() {
             rangeEnd={readerOpen.rangeEnd}
             initialShowSavedPanel={readerOpen.initialShowSavedPanel}
             initialSavedTab={readerOpen.initialSavedTab}
+            initialPlaylistTheme={readerOpen.initialPlaylistTheme}
             onClose={() => setReaderOpen(null)}
             onNavigate={readerNavigate}
             jumpToVerse={jumpToVerse}

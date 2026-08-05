@@ -1,4 +1,5 @@
 import rawThemes from "@/data/themes.json";
+import { SURAHS } from "@/lib/surahs";
 import {
   loadProjects,
   saveProjects,
@@ -21,7 +22,34 @@ export type ThemeEntry = {
   verses: string[]; // Format: "surah:ayah" e.g. "2:153"
 };
 
+export type ThemePlaylistItem = {
+  index: number;
+  surah: number;
+  ayah: number;
+  key: string;
+  surahNameEn: string;
+  surahNameAr: string;
+};
+
 export const THEMES: ThemeEntry[] = rawThemes as ThemeEntry[];
+
+/**
+ * Generate a sequential playlist of track items for a theme
+ */
+export function createThemePlaylist(theme: ThemeEntry): ThemePlaylistItem[] {
+  const parsed = parseVerseSpecs(theme.verses);
+  return parsed.map((item, idx) => {
+    const sMeta = SURAHS.find((s) => s.n === item.surah);
+    return {
+      index: idx,
+      surah: item.surah,
+      ayah: item.ayah,
+      key: item.key,
+      surahNameEn: sMeta?.en ?? `Surah ${item.surah}`,
+      surahNameAr: sMeta?.ar ?? "",
+    };
+  });
+}
 
 /**
  * Extract list of unique categories from dataset
