@@ -10,6 +10,7 @@ import {
   Bot,
   Timer,
   Layers,
+  Library,
 } from "lucide-react";
 import { LangProvider, useLang } from "@/lib/i18n";
 import { SURAHS } from "@/lib/surahs";
@@ -31,6 +32,8 @@ import { Footer } from "@/components/sections/footer";
 import { SurahExplorer } from "@/components/surah-explorer";
 import { ShareSurah } from "@/components/share-surah";
 import { FacilitatorTools } from "@/components/facilitator-tools";
+import { ThematicLibrary } from "@/components/sections/thematic-library";
+import type { ThemeEntry } from "@/lib/themes";
 
 const SurahReader = lazy(() =>
   import("@/components/reader").then((m) => ({ default: m.SurahReader })),
@@ -100,6 +103,17 @@ function Page() {
     setReaderOpen((r) => (r ? { ...r, surahN: n } : r));
   };
 
+  const handleOpenTheme = (theme: ThemeEntry) => {
+    if (theme.verses.length > 0) {
+      const firstVerse = theme.verses[0];
+      const [surahStr, verseStr] = firstVerse.split(":");
+      const surahN = parseInt(surahStr, 10);
+      const ayahN = verseStr ? parseInt(verseStr.split("-")[0], 10) : 1;
+      openReader(surahN);
+      setJumpToVerse(ayahN);
+    }
+  };
+
   useEffect(() => {
     if (!readerOpen) {
       setReaderVerses(null);
@@ -127,6 +141,7 @@ function Page() {
     { key: "nav_about", anchor: "about", icon: Compass },
     { key: "nav_cycles", anchor: "cycles", icon: Layers },
     { key: "nav_explorer", anchor: "session", icon: ScrollText },
+    { key: "nav_themes", anchor: "themes", icon: Library },
     { key: "nav_share", anchor: "share", icon: Share2 },
     { key: "nav_howto", anchor: "howto", icon: StickyNote },
     { key: "nav_guide", anchor: "guide", icon: Play },
@@ -152,6 +167,7 @@ function Page() {
           onNavigate={goToTool}
         />
         <SurahExplorer onOpenSurah={openReader} />
+        <ThematicLibrary onOpenTheme={handleOpenTheme} />
         <ShareSurah
           langs={{ ar: showAr, en: showEn, ur: showUr }}
           onToggleLang={toggleLang}

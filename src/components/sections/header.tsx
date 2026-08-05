@@ -27,13 +27,14 @@ export function Header() {
     "nav_about",
     "nav_cycles",
     "nav_explorer",
+    "nav_themes",
     "nav_share",
     "nav_guide",
     "nav_kit",
     "nav_ai",
     "nav_tools",
   ];
-  const anchors = ["about", "cycles", "explorer", "share", "guide", "kit", "ai", "tools"];
+  const anchors = ["about", "cycles", "explorer", "themes", "share", "guide", "kit", "ai", "tools"];
 
   return (
     <>
