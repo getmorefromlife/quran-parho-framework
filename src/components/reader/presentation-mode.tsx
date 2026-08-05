@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -24,12 +24,21 @@ import {
   MessageSquare,
   Hourglass,
   RotateCcw,
+  Check,
 } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { QVerse } from "@/lib/quran-data";
 import { getFontFamily, type ReaderPrefs } from "@/lib/reader-fonts";
+import {
+  TRANSLATIONS_BY_LANG,
+  LANG_LABELS,
+  getTranslation,
+  getTranslationText,
+  type TranslationDef,
+  type TranslationLang,
+} from "@/lib/translations";
 
 export type PresentationModeProps = {
   surahN: number;
@@ -149,17 +158,20 @@ export function PresentationMode({
   prefs,
   selectedTrans,
 }: PresentationModeProps) {
-  const { lang } = useLang();
+  const { lang, tr } = useLang();
 
   const [fontSizeRem, setFontSizeRem] = useState(3.2);
   const [themeStyle, setThemeStyle] = useState<ThemeStyle>("midnight");
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Translation visibility filters from reader settings
-  const showEnglish =
-    !selectedTrans || selectedTrans.length === 0 || selectedTrans.includes("english_qarai");
-  const showUrdu =
-    !selectedTrans || selectedTrans.length === 0 || selectedTrans.includes("urdu_jawadi");
+  const [activeTrans, setActiveTrans] = useState<string[]>(() =>
+    selectedTrans?.length ? [...selectedTrans] : ["qarai", "jawadi"],
+  );
+  const [showTransPicker, setShowTransPicker] = useState(false);
+  const activeTransDefs = activeTrans
+    .map(getTranslation)
+    .filter((t): t is TranslationDef => Boolean(t));
   const [showPrompts, setShowPrompts] = useState(false);
 
   // Content Display Mode: both (Arabic+Translation) | translation_only | arabic_only
@@ -191,6 +203,32 @@ export function PresentationMode({
   const hasNext = currentAyah < maxVerses || surahN < 114;
 
   const currentTheme = THEMES[themeStyle];
+
+  // Render the active selected translations for a verse
+  const renderTrans = (v: QVerse, size: { ltr: number; rtl: number }): ReactNode[] => {
+    return activeTransDefs.flatMap((tDef) => {
+      const text = getTranslationText(v as unknown as Record<string, unknown>, tDef.id);
+      if (!text) return [];
+      const isRTL = tDef.dir === "rtl";
+      return [
+        <p
+          key={tDef.id}
+          dir={tDef.dir}
+          className={cn(
+            "leading-relaxed transition-all",
+            isRTL
+              ? cn("font-arabic text-right", currentTheme.urduText)
+              : cn("font-serif", currentTheme.transText),
+          )}
+          style={{ fontSize: `${isRTL ? size.rtl : size.ltr}rem` }}
+        >
+          "{text}"
+        </p>,
+      ];
+    });
+  };
+
+  const singleTrans = activeVerse ? renderTrans(activeVerse, { ltr: 1.25, rtl: 1.3 }) : [];
 
   // Fullscreen helper
   const toggleFullscreen = () => {
@@ -412,6 +450,91 @@ export function PresentationMode({
               <Type className="h-3.5 w-3.5" />
               <span className="hidden xl:inline">Arabic Only</span>
             </button>
+          </div>
+
+          {/* Translation Picker: Choose from all 40+ translations */}
+          <div className="relative">
+            <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
+              <button
+                onClick={() => setShowTransPicker((v) => !v)}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                  showTransPicker
+                    ? "bg-amber-500 text-black shadow-sm"
+                    : "text-zinc-400 hover:text-white",
+                )}
+                title={tr("present_translations")}
+              >
+                <Languages className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">{tr("present_translations")}</span>
+              </button>
+            </div>
+
+            {showTransPicker && (
+              <div className="absolute right-0 top-full mt-2 z-50 w-[min(90vw,22rem)] rounded-2xl border border-zinc-700 bg-zinc-900/95 backdrop-blur-xl shadow-2xl">
+                <div className="flex items-center justify-between px-4 pt-3 pb-1 border-b border-zinc-800">
+                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                    {tr("present_translations")}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() =>
+                        setActiveTrans(
+                          selectedTrans?.length ? [...selectedTrans] : ["qarai", "jawadi"],
+                        )
+                      }
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
+                      title={tr("present_sync_reader")}
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      <span className="hidden sm:inline">{tr("present_sync_short")}</span>
+                    </button>
+                    <button
+                      onClick={() => setShowTransPicker(false)}
+                      className="flex items-center justify-center h-6 w-6 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
+                      title={tr("close_reader")}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-[70vh] overflow-y-auto p-3 space-y-3">
+                  {(Object.keys(TRANSLATIONS_BY_LANG) as TranslationLang[]).map((lg) => (
+                    <div key={lg} className="space-y-1.5">
+                      <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                        {LANG_LABELS[lg].en}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {TRANSLATIONS_BY_LANG[lg].map((t) => {
+                          const active = activeTrans.includes(t.id);
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              title={t.translator}
+                              onClick={() =>
+                                setActiveTrans((prev) =>
+                                  active ? prev.filter((x) => x !== t.id) : [...prev, t.id],
+                                )
+                              }
+                              className={cn(
+                                "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer",
+                                active
+                                  ? "bg-amber-500/15 border-amber-500/60 text-amber-300"
+                                  : "border-zinc-700 text-zinc-400 hover:border-amber-500/40 hover:text-zinc-200",
+                              )}
+                            >
+                              {active && <Check className="h-3 w-3" />}
+                              {t.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Theme Selector: Light | Parchment | Emerald | Midnight | OLED */}
@@ -642,140 +765,59 @@ export function PresentationMode({
               <div
                 className={cn(
                   "gap-4 text-left",
-                  layoutWidth === "wide" ? "grid lg:grid-cols-1 space-y-4" : "space-y-8",
+                  layoutWidth === "wide" ? "grid lg:grid-cols-2 xl:grid-cols-3" : "space-y-8",
                 )}
               >
-                {turnBlockVerses.map((v) => (
-                  <div
-                    key={v.ayah}
-                    className={cn(
-                      "p-5 sm:p-6 rounded-2xl border transition-all",
-                      currentTheme.border,
-                      currentTheme.cardBg,
-                    )}
-                  >
-                    {contentMode === "translation_only" ? (
-                      /* Translation-Only Focus Mode — Respects Reader Settings Selection */
-                      <div className="space-y-4 text-left">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={cn(
-                              "inline-flex h-8 w-8 items-center justify-center rounded-full border text-sm font-bold shadow-sm",
-                              currentTheme.badgeBg,
-                              currentTheme.badgeText,
-                            )}
-                          >
-                            {v.ayah}
-                          </span>
-                          <span
-                            className={cn(
-                              "text-xs uppercase font-bold tracking-wider",
-                              currentTheme.gold,
-                            )}
-                          >
-                            {lang === "ur" ? "ترجمہ فہم موڈ" : "Translation Focus Mode"}
-                          </span>
-                        </div>
-                        {showEnglish && v.english_qarai && (
-                          <p
-                            className={cn(
-                              "font-serif leading-relaxed transition-all",
-                              currentTheme.transText,
-                            )}
-                            style={{ fontSize: `${fontSizeRem * 0.75}rem` }}
-                          >
-                            "{v.english_qarai}"
-                          </p>
-                        )}
-                        {showUrdu && v.urdu_jawadi && (
-                          <p
-                            dir="rtl"
-                            className={cn(
-                              "font-arabic leading-relaxed text-right pt-1 transition-all",
-                              currentTheme.urduText,
-                            )}
-                            style={{ fontSize: `${fontSizeRem * 0.85}rem` }}
-                          >
-                            "{v.urdu_jawadi}"
-                          </p>
-                        )}
-                      </div>
-                    ) : contentMode === "arabic_only" ? (
-                      /* Arabic-Only Calligraphy Mode */
-                      <div className="flex items-start justify-between gap-4">
-                        <span
-                          className={cn(
-                            "inline-flex align-middle h-8 w-8 items-center justify-center rounded-full border text-sm font-bold shrink-0",
-                            currentTheme.badgeBg,
-                            currentTheme.badgeText,
-                          )}
-                        >
-                          {v.ayah}
-                        </span>
-                        <p
-                          dir="rtl"
-                          className={cn(
-                            "font-arabic font-semibold leading-relaxed tracking-wide text-right flex-1",
-                            currentTheme.gold,
-                          )}
-                          style={{ fontSize: `${fontSizeRem * 0.9}rem` }}
-                        >
-                          {v.arabic}
-                        </p>
-                      </div>
-                    ) : layoutWidth === "wide" ? (
-                      /* Both (Wide 2-Column Layout): Left = Translations | Right = Arabic */
-                      <div className="grid md:grid-cols-12 gap-6 items-center">
-                        {/* Left Side (Cols 1 to 6): English & Urdu Translations */}
-                        <div className="md:col-span-6 space-y-2 text-left order-2 md:order-1">
-                          {showEnglish && v.english_qarai && (
-                            <p
-                              className={cn("font-serif leading-relaxed", currentTheme.transText)}
-                              style={{ fontSize: `${fontSizeRem * 0.55}rem` }}
-                            >
-                              "{v.english_qarai}"
-                            </p>
-                          )}
-                          {showUrdu && v.urdu_jawadi && (
-                            <p
-                              dir="rtl"
+                {turnBlockVerses.map((v) => {
+                  const trans = renderTrans(
+                    v,
+                    contentMode === "translation_only"
+                      ? { ltr: 0.75, rtl: 0.85 }
+                      : { ltr: 0.55, rtl: 0.65 },
+                  );
+                  return (
+                    <div
+                      key={v.ayah}
+                      className={cn(
+                        "p-5 sm:p-6 rounded-2xl border transition-all",
+                        currentTheme.border,
+                        currentTheme.cardBg,
+                      )}
+                    >
+                      {contentMode === "translation_only" ? (
+                        /* Translation-Only Focus Mode — Respects Reader Settings Selection */
+                        <div className="space-y-4 text-left">
+                          <div className="flex items-center gap-2">
+                            <span
                               className={cn(
-                                "font-arabic leading-relaxed text-right",
-                                currentTheme.urduText,
+                                "inline-flex h-8 w-8 items-center justify-center rounded-full border text-sm font-bold shadow-sm",
+                                currentTheme.badgeBg,
+                                currentTheme.badgeText,
                               )}
-                              style={{ fontSize: `${fontSizeRem * 0.65}rem` }}
                             >
-                              "{v.urdu_jawadi}"
+                              {v.ayah}
+                            </span>
+                            <span
+                              className={cn(
+                                "text-xs uppercase font-bold tracking-wider",
+                                currentTheme.gold,
+                              )}
+                            >
+                              {lang === "ur" ? "ترجمہ فہم موڈ" : "Translation Focus Mode"}
+                            </span>
+                          </div>
+                          {trans.length ? (
+                            <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3 text-left">
+                              {trans}
+                            </div>
+                          ) : (
+                            <p className={cn("text-sm italic opacity-60", currentTheme.transText)}>
+                              {tr("present_no_translation")}
                             </p>
                           )}
                         </div>
-
-                        {/* Right Side (Cols 7 to 12): Arabic Calligraphy & Ayah Number */}
-                        <div className="md:col-span-6 flex items-start justify-end gap-4 order-1 md:order-2">
-                          <p
-                            dir="rtl"
-                            className={cn(
-                              "font-arabic font-semibold leading-relaxed tracking-wide text-right flex-1",
-                              currentTheme.gold,
-                            )}
-                            style={{ fontSize: `${fontSizeRem * 0.85}rem` }}
-                          >
-                            {v.arabic}
-                          </p>
-                          <span
-                            className={cn(
-                              "inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold shrink-0",
-                              currentTheme.badgeBg,
-                              currentTheme.badgeText,
-                            )}
-                          >
-                            {v.ayah}
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      /* Both (Standard Stacked Layout) */
-                      <div className="space-y-3">
+                      ) : contentMode === "arabic_only" ? (
+                        /* Arabic-Only Calligraphy Mode */
                         <div className="flex items-start justify-between gap-4">
                           <span
                             className={cn(
@@ -792,39 +834,92 @@ export function PresentationMode({
                               "font-arabic font-semibold leading-relaxed tracking-wide text-right flex-1",
                               currentTheme.gold,
                             )}
-                            style={{ fontSize: `${fontSizeRem * 0.85}rem` }}
+                            style={{ fontSize: `${fontSizeRem * 0.9}rem` }}
                           >
                             {v.arabic}
                           </p>
                         </div>
+                      ) : layoutWidth === "wide" ? (
+                        /* Both (Wide 2-Column Layout): Left = Translations | Right = Arabic */
+                        <div className="grid md:grid-cols-12 gap-6 items-center">
+                          {/* Left Side (Cols 1 to 6): English & Urdu Translations */}
+                          <div className="md:col-span-6 space-y-2 text-left order-2 md:order-1">
+                            {trans.length ? (
+                              trans
+                            ) : (
+                              <p
+                                className={cn("text-sm italic opacity-60", currentTheme.transText)}
+                              >
+                                {tr("present_no_translation")}
+                              </p>
+                            )}
+                          </div>
 
-                        {showEnglish && v.english_qarai && (
-                          <p
-                            className={cn(
-                              "font-serif leading-relaxed pl-12",
-                              currentTheme.transText,
-                            )}
-                            style={{ fontSize: `${fontSizeRem * 0.55}rem` }}
-                          >
-                            "{v.english_qarai}"
-                          </p>
-                        )}
-                        {showUrdu && v.urdu_jawadi && (
-                          <p
-                            dir="rtl"
-                            className={cn(
-                              "font-arabic leading-relaxed text-right pr-2",
-                              currentTheme.urduText,
-                            )}
-                            style={{ fontSize: `${fontSizeRem * 0.65}rem` }}
-                          >
-                            "{v.urdu_jawadi}"
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                          {/* Right Side (Cols 7 to 12): Arabic Calligraphy & Ayah Number */}
+                          <div className="md:col-span-6 flex items-start justify-end gap-4 order-1 md:order-2">
+                            <p
+                              dir="rtl"
+                              className={cn(
+                                "font-arabic font-semibold leading-relaxed tracking-wide text-right flex-1",
+                                currentTheme.gold,
+                              )}
+                              style={{ fontSize: `${fontSizeRem * 0.85}rem` }}
+                            >
+                              {v.arabic}
+                            </p>
+                            <span
+                              className={cn(
+                                "inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold shrink-0",
+                                currentTheme.badgeBg,
+                                currentTheme.badgeText,
+                              )}
+                            >
+                              {v.ayah}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Both (Standard Stacked Layout) */
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between gap-4">
+                            <span
+                              className={cn(
+                                "inline-flex align-middle h-8 w-8 items-center justify-center rounded-full border text-sm font-bold shrink-0",
+                                currentTheme.badgeBg,
+                                currentTheme.badgeText,
+                              )}
+                            >
+                              {v.ayah}
+                            </span>
+                            <p
+                              dir="rtl"
+                              className={cn(
+                                "font-arabic font-semibold leading-relaxed tracking-wide text-right flex-1",
+                                currentTheme.gold,
+                              )}
+                              style={{ fontSize: `${fontSizeRem * 0.85}rem` }}
+                            >
+                              {v.arabic}
+                            </p>
+                          </div>
+
+                          {trans.length ? (
+                            trans
+                          ) : (
+                            <p
+                              className={cn(
+                                "text-sm italic opacity-60 pl-12",
+                                currentTheme.transText,
+                              )}
+                            >
+                              {tr("present_no_translation")}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Turn Completion Banner */}
@@ -894,18 +989,17 @@ export function PresentationMode({
 
               {/* English & Urdu Translations */}
               {activeVerse && (
-                <div className="space-y-4 max-w-3xl mx-auto pt-4 border-t border-zinc-800/60">
-                  {activeVerse.english_qarai && (
-                    <p className="text-xl sm:text-2xl font-serif text-zinc-200 leading-relaxed">
-                      "{activeVerse.english_qarai}"
-                    </p>
-                  )}
-                  {activeVerse.urdu_jawadi && (
+                <div className="space-y-4 max-w-4xl mx-auto pt-4 border-t border-zinc-800/60">
+                  {singleTrans.length ? (
+                    singleTrans
+                  ) : (
                     <p
-                      dir="rtl"
-                      className="text-xl sm:text-2xl font-arabic text-amber-200/90 leading-relaxed pt-2"
+                      className={cn(
+                        "text-lg italic opacity-60 text-center",
+                        currentTheme.transText,
+                      )}
                     >
-                      "{activeVerse.urdu_jawadi}"
+                      {tr("present_no_translation")}
                     </p>
                   )}
                 </div>
