@@ -44,7 +44,9 @@ for (const [n, list] of bySurah) {
   const file = join(outDir, `surah-${n}.json`);
   writeFileSync(file, JSON.stringify(list));
   total += list.length;
-  console.log(`surah-${n}.json  ${String(list.length).padStart(4)} verses  ${(JSON.stringify(list).length / 1024).toFixed(1)} kB`);
+  console.log(
+    `surah-${n}.json  ${String(list.length).padStart(4)} verses  ${(JSON.stringify(list).length / 1024).toFixed(1)} kB`,
+  );
 }
 
 console.log(`\nWrote ${bySurah.size} surah files, ${total} verses to ${outDir}`);
