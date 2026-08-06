@@ -143,6 +143,47 @@ const THEMES: Record<
   },
 };
 
+type ContentMode = "both" | "translation_only" | "arabic_only";
+type ViewMode = "turn_block" | "single_verse";
+
+// Standard on-screen font sizes (rem) applied on entering presentation mode and
+// whenever the user switches content/view mode (unless a favorite is active).
+const STANDARD_SIZES: Record<ViewMode, Record<ContentMode, { ar?: number; tr?: number }>> = {
+  turn_block: {
+    both: { ar: 4.8, tr: 2.0 },
+    translation_only: { tr: 3.3 },
+    arabic_only: { ar: 4.8 },
+  },
+  single_verse: {
+    both: { ar: 4.8, tr: 4.8 },
+    translation_only: { tr: 4.8 },
+    arabic_only: { ar: 4.8 },
+  },
+};
+
+const FAV_AR_KEY = "qp_pres_ar";
+const FAV_TR_KEY = "qp_pres_tr";
+
+function loadFavoriteSizes(): { ar: number; tr: number } | null {
+  if (typeof window === "undefined") return null;
+  const ar = parseFloat(localStorage.getItem(FAV_AR_KEY) ?? "");
+  const tr = parseFloat(localStorage.getItem(FAV_TR_KEY) ?? "");
+  if (Number.isFinite(ar) && Number.isFinite(tr)) return { ar, tr };
+  return null;
+}
+
+function saveFavoriteSizes(ar: number, tr: number) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(FAV_AR_KEY, String(ar));
+  localStorage.setItem(FAV_TR_KEY, String(tr));
+}
+
+function clearFavoriteSizes() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(FAV_AR_KEY);
+  localStorage.removeItem(FAV_TR_KEY);
+}
+
 export function PresentationMode({
   surahN,
   verses,
@@ -166,8 +207,12 @@ export function PresentationMode({
 }: PresentationModeProps) {
   const { lang, tr } = useLang();
 
-  const [arabicFontRem, setArabicFontRem] = useState(3.2);
-  const [transFontRem, setTransFontRem] = useState(1.0);
+  const [arabicFontRem, setArabicFontRem] = useState(4.8);
+  const [transFontRem, setTransFontRem] = useState(2.0);
+  const [favSizes, setFavSizes] = useState<{ ar: number; tr: number } | null>(() =>
+    loadFavoriteSizes(),
+  );
+  const [useFavorite, setUseFavorite] = useState(false);
   const [themeStyle, setThemeStyle] = useState<ThemeStyle>("midnight");
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -187,9 +232,7 @@ export function PresentationMode({
   const [showPrompts, setShowPrompts] = useState(false);
 
   // Content Display Mode: both (Arabic+Translation) | translation_only | arabic_only
-  const [contentMode, setContentMode] = useState<"both" | "translation_only" | "arabic_only">(
-    "both",
-  );
+  const [contentMode, setContentMode] = useState<ContentMode>("both");
 
   // Live Session & Q&A Timers
   const [sessionTimer, setSessionTimer] = useState(3600); // 60 minutes
@@ -201,10 +244,18 @@ export function PresentationMode({
   const [timerSeconds, setTimerSeconds] = useState(300); // 5-min turn timer
   const [timerActive, setTimerActive] = useState(false);
 
-  const [viewMode, setViewMode] = useState<"turn_block" | "single_verse">("turn_block");
+  const [viewMode, setViewMode] = useState<ViewMode>("turn_block");
   const [layoutWidth, setLayoutWidth] = useState<"wide" | "centered">("wide");
   const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(true);
   const [showMore, setShowMore] = useState(false);
+
+  // Apply the standard size for the current mode (skipped while a favorite is active)
+  useEffect(() => {
+    if (useFavorite) return;
+    const std = STANDARD_SIZES[viewMode][contentMode];
+    if (std.ar != null) setArabicFontRem(std.ar);
+    if (std.tr != null) setTransFontRem(std.tr);
+  }, [viewMode, contentMode, useFavorite]);
 
   // Turn block calculation (5 verses)
   const blockStart = turnStartAyah || Math.floor((currentAyah - 1) / 5) * 5 + 1;
@@ -347,23 +398,8 @@ export function PresentationMode({
   );
 
   const singleTrans = activeVerse
-    ? renderTrans(
-        activeVerse,
-        contentMode === "translation_only"
-          ? { ltr: 2.0 * transFontRem, rtl: 2.2 * transFontRem }
-          : { ltr: 1.25 * transFontRem, rtl: 1.3 * transFontRem },
-      )
+    ? renderTrans(activeVerse, { ltr: transFontRem, rtl: transFontRem * 1.1 })
     : [];
-
-  // Effective translation size (LTR base) for the current view + content mode
-  const transDisplayRem =
-    (viewMode === "turn_block"
-      ? contentMode === "translation_only"
-        ? 1.1
-        : 0.85
-      : contentMode === "translation_only"
-        ? 2.0
-        : 1.25) * transFontRem;
 
   // Fullscreen helper
   const toggleFullscreen = () => {
@@ -884,10 +920,10 @@ export function PresentationMode({
                           A-
                         </button>
                         <span className="text-[10px] font-mono text-zinc-500">
-                          {transDisplayRem.toFixed(1)}
+                          {transFontRem.toFixed(1)}
                         </span>
                         <button
-                          onClick={() => setTransFontRem((s) => Math.min(4.0, s + 0.2))}
+                          onClick={() => setTransFontRem((s) => Math.min(8.0, s + 0.2))}
                           className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
                           title="Increase Translation Font Size"
                         >
@@ -896,6 +932,88 @@ export function PresentationMode({
                       </div>
                     </div>
                   )}
+
+                  {/* Favorite Size Preset */}
+                  <div className="space-y-2">
+                    <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                      {lang === "en" ? "Size Preset" : "سائز پری سیٹ"}
+                    </div>
+                    <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 gap-1 w-fit">
+                      <button
+                        onClick={() => setUseFavorite(false)}
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                          !useFavorite
+                            ? "bg-amber-500 text-black shadow-sm"
+                            : "text-zinc-400 hover:text-white",
+                        )}
+                        title={lang === "en" ? "Use Standard Sizes" : "معیاری سائز استعمال کریں"}
+                      >
+                        {lang === "en" ? "Standard" : "معیاری"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (!favSizes) return;
+                          setArabicFontRem(favSizes.ar);
+                          setTransFontRem(favSizes.tr);
+                          setUseFavorite(true);
+                        }}
+                        disabled={!favSizes}
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-40",
+                          useFavorite
+                            ? "bg-emerald-500 text-white shadow-sm"
+                            : "text-zinc-400 hover:text-white",
+                        )}
+                        title={
+                          favSizes
+                            ? `${lang === "en" ? "Apply AR" : "لگائیں AR"} ${favSizes.ar.toFixed(1)} · TR ${favSizes.tr.toFixed(1)}`
+                            : lang === "en"
+                              ? "No favorite saved yet"
+                              : "ابھی کوئی پسندیدہ محفوظ نہیں"
+                        }
+                      >
+                        {lang === "en" ? "My Favorite" : "میرا پسندیدہ"}
+                      </button>
+                    </div>
+                    {favSizes && (
+                      <div className="text-[10px] font-mono text-zinc-500">
+                        AR {favSizes.ar.toFixed(1)} · TR {favSizes.tr.toFixed(1)}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          saveFavoriteSizes(arabicFontRem, transFontRem);
+                          setFavSizes({ ar: arabicFontRem, tr: transFontRem });
+                          setUseFavorite(true);
+                        }}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/40 hover:bg-amber-500/20 transition-all cursor-pointer"
+                        title={
+                          lang === "en"
+                            ? "Save current sizes as your favorite"
+                            : "موجودہ سائز کو پسندیدہ کے طور پر محفوظ کریں"
+                        }
+                      >
+                        <Check className="h-3 w-3" />
+                        {lang === "en" ? "Save Current Sizes" : "موجودہ سائز محفوظ کریں"}
+                      </button>
+                      {favSizes && (
+                        <button
+                          onClick={() => {
+                            clearFavoriteSizes();
+                            setFavSizes(null);
+                            setUseFavorite(false);
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-zinc-400 hover:text-red-400 border border-zinc-800 hover:border-red-500/40 transition-all cursor-pointer"
+                          title={lang === "en" ? "Remove favorite" : "پسندیدہ ہٹائیں"}
+                        >
+                          <X className="h-3 w-3" />
+                          {lang === "en" ? "Remove" : "ہٹائیں"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
                   {/* Layout Width Switcher */}
                   <div className="space-y-2">
@@ -1047,9 +1165,7 @@ export function PresentationMode({
                 {turnBlockVerses.map((v) => {
                   const trans = renderTrans(
                     v,
-                    contentMode === "translation_only"
-                      ? { ltr: 1.1 * transFontRem, rtl: 1.2 * transFontRem }
-                      : { ltr: 0.85 * transFontRem, rtl: 0.95 * transFontRem },
+                    { ltr: transFontRem, rtl: transFontRem * 1.1 },
                     true,
                   );
                   return (
@@ -1099,14 +1215,14 @@ export function PresentationMode({
                         </div>
                       ) : contentMode === "arabic_only" ? (
                         /* Arabic-Only Calligraphy Mode */
-                        renderArabic(v, arabicFontRem * 0.9)
+                        renderArabic(v, arabicFontRem)
                       ) : (
                         /* Both (Stacked Layout): Arabic Above, Translation Boxes Below */
                         <div
                           dir={stageDir}
                           className={cn("space-y-4", allRtl ? "text-right" : "text-left")}
                         >
-                          {renderArabic(v, arabicFontRem * 0.85)}
+                          {renderArabic(v, arabicFontRem)}
 
                           {trans.length ? (
                             trans
@@ -1175,11 +1291,17 @@ export function PresentationMode({
 
               {contentMode === "arabic_only" ? (
                 /* Ultra-Large Arabic Text with Ayah Number */
-                activeVerse && renderArabic(activeVerse, arabicFontRem * 1.25)
+                activeVerse && renderArabic(activeVerse, arabicFontRem)
               ) : contentMode === "translation_only" ? (
                 /* Translation-Only Focus Mode */
                 activeVerse && (
-                  <div dir={stageDir} className="space-y-4 max-w-4xl mx-auto">
+                  <div
+                    dir={stageDir}
+                    className={cn(
+                      "space-y-4",
+                      layoutWidth === "wide" ? "max-w-[96vw]" : "max-w-4xl mx-auto",
+                    )}
+                  >
                     {singleTrans.length ? (
                       singleTrans
                     ) : (
@@ -1203,7 +1325,10 @@ export function PresentationMode({
                   {activeVerse && (
                     <div
                       dir={stageDir}
-                      className="space-y-4 max-w-4xl mx-auto pt-4 border-t border-zinc-800/60"
+                      className={cn(
+                        "space-y-4 pt-4 border-t border-zinc-800/60",
+                        layoutWidth === "wide" ? "max-w-[96vw]" : "max-w-4xl mx-auto",
+                      )}
                     >
                       {singleTrans.length ? (
                         singleTrans
