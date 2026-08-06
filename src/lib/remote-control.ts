@@ -1,4 +1,4 @@
-import type { Realtime, RealtimeChannel } from "ably";
+import type { Realtime, RealtimeChannel, Rest, Channel } from "ably";
 import type { TimerDurations } from "@/lib/timer-durations";
 
 export type RemoteRole = "host" | "remote";
@@ -47,8 +47,9 @@ export type RemoteRoomEvents = {
 export type RemoteRoom = {
   room: string;
   publish: (msg: RemoteMessage) => void;
-  /** Force the underlying connection to tear down and re-establish (useful after
-   * a mobile tab has been suspended and its socket went stale). */
+  /** Recover a dead link. On the host this tears down and rebuilds the
+   * realtime socket; on the phone this forces an immediate poll of the
+   * REST channel (there is no socket to rebuild). */
   reconnect: () => void;
   close: () => void;
 };
@@ -116,8 +117,30 @@ export async function openRemoteRoom(
   const key = getAblyKey();
   if (!key) return null;
 
+  // The host uses a realtime WebSocket (it has to push state every 1-2s and
+  // respond instantly to phone taps). The phone deliberately uses plain REST
+  // (HTTP) polling: mobile browsers suspend/kill long-lived WebSockets in the
+  // background, but ordinary HTTPS requests always recover on their own.
+  return role === "host"
+    ? openHostRoom(room, key, role, events)
+    : openRemotePollRoom(room, key, events);
+}
+
+const HOST_STATE_POLL_MS = 2000;
+const HOST_MEMBERS_POLL_MS = 5000;
+const HOST_PING_MS = 5000;
+const HOST_PING_FAILS = 2;
+
+// ───────────────────────── Host: realtime socket ─────────────────────────
+
+async function openHostRoom(
+  room: string,
+  key: string,
+  role: RemoteRole,
+  events: RemoteRoomEvents,
+): Promise<RemoteRoom> {
   const { Realtime: AblyRealtime } = await import("ably");
-  const makeClientId = () => `${role}-${crypto.randomUUID()}`;
+  const makeClientId = () => `host-${crypto.randomUUID()}`;
 
   const onMsg = (msg: { data?: unknown }) => {
     const data = msg.data as RemoteMessage;
@@ -178,7 +201,36 @@ export async function openRemoteRoom(
     void refreshMembers();
   };
 
+  // Liveness heartbeat: if the socket silently dies while the SDK still thinks
+  // it is connected, ping() rejects and we rebuild a fresh client so state
+  // broadcasts resume for the phone.
+  let heartbeat: number | null = null;
+  let pingFails = 0;
+  const startHeartbeat = () => {
+    if (heartbeat !== null) window.clearInterval(heartbeat);
+    heartbeat = window.setInterval(() => {
+      const client = realtime;
+      if (!client || client.connection.state !== "connected") {
+        pingFails = 0;
+        return;
+      }
+      void client.connection
+        .ping()
+        .then(() => {
+          pingFails = 0;
+        })
+        .catch(() => {
+          pingFails += 1;
+          if (pingFails >= HOST_PING_FAILS) {
+            pingFails = 0;
+            connect();
+          }
+        });
+    }, HOST_PING_MS);
+  };
+
   connect();
+  startHeartbeat();
 
   return {
     room,
@@ -186,13 +238,91 @@ export async function openRemoteRoom(
       if (channel)
         void channel.publish("msg", msg).catch((e) => events.onError?.(describeError(e)));
     },
-    reconnect: connect,
+    reconnect: () => {
+      connect();
+      startHeartbeat();
+    },
     close: () => {
+      if (heartbeat !== null) window.clearInterval(heartbeat);
+      heartbeat = null;
       if (channel) void channel.presence.leave().catch(() => undefined);
       if (channel) channel.detach();
       if (realtime) realtime.close();
       channel = null;
       realtime = null;
+    },
+  };
+}
+
+// ──────────────────────── Phone: REST (HTTP) polling ───────────────────────
+
+async function openRemotePollRoom(
+  room: string,
+  key: string,
+  events: RemoteRoomEvents,
+): Promise<RemoteRoom> {
+  const { Rest: AblyRest } = await import("ably");
+  const rest = new AblyRest({ key, clientId: `remote-${crypto.randomUUID()}` });
+  const channel: Channel = rest.channels.get(`qp:${room}`);
+
+  let stopped = false;
+  let everConnected = false;
+
+  const fetchState = async () => {
+    if (stopped) return;
+    try {
+      const page = await channel.history({ limit: 1 });
+      if (stopped) return;
+      if (!everConnected) {
+        everConnected = true;
+        events.onConnectionState?.("connected");
+      }
+      events.onError?.(null);
+      const latest = page.items[0];
+      const data = latest?.data as RemoteMessage | undefined;
+      if (data?.type === "state") events.onState?.(data);
+    } catch (e) {
+      if (!stopped) events.onError?.(describeError(e));
+    }
+  };
+
+  const fetchMembers = async () => {
+    if (stopped) return;
+    try {
+      const page = await channel.presence.get();
+      if (stopped) return;
+      const members: RoomMember[] = page.items
+        .map((p) => ({
+          role: ((p.data as { role?: RemoteRole } | undefined)?.role ?? "remote") as RemoteRole,
+          clientId: p.clientId,
+        }))
+        .filter((m) => Boolean(m.clientId));
+      events.onMembers?.(members);
+    } catch {
+      // presence unavailable — ignore
+    }
+  };
+
+  const stateTimer = window.setInterval(fetchState, HOST_STATE_POLL_MS);
+  const membersTimer = window.setInterval(fetchMembers, HOST_MEMBERS_POLL_MS);
+  void fetchState();
+  void fetchMembers();
+
+  return {
+    room,
+    publish: (msg: RemoteMessage) => {
+      void channel.publish("msg", msg).catch((e) => events.onError?.(describeError(e)));
+    },
+    // No socket to rebuild — but kick an immediate poll so a manual retry (or
+    // the stale watchdog) re-syncs the phone without waiting for the next tick.
+    reconnect: () => {
+      void fetchState();
+      void fetchMembers();
+    },
+    close: () => {
+      stopped = true;
+      window.clearInterval(stateTimer);
+      window.clearInterval(membersTimer);
     },
   };
 }
