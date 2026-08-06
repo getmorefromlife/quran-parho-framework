@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -114,6 +114,7 @@ function TimerControl({
   durationKey,
   accent,
   lang,
+  disabled,
   onCommand,
 }: {
   label: string;
@@ -123,6 +124,7 @@ function TimerControl({
   durationKey: keyof TimerDurations;
   accent: Accent;
   lang: string;
+  disabled?: boolean;
   onCommand: (cmd: RemoteCommand) => void;
 }) {
   const a = ACCENTS[accent];
@@ -179,8 +181,9 @@ function TimerControl({
       <div className="mt-6 grid grid-cols-3 gap-3">
         <button
           onClick={() => onCommand({ type: "cmd", action: toggleAction })}
+          disabled={disabled}
           className={cn(
-            "col-span-2 inline-flex h-14 items-center justify-center gap-2 rounded-2xl text-sm font-bold transition-all cursor-pointer active:scale-95",
+            "col-span-2 inline-flex h-14 items-center justify-center gap-2 rounded-2xl text-sm font-bold transition-all cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-40",
             active ? "border border-zinc-700 bg-zinc-800 text-zinc-100" : cn("border-0", a.chip),
           )}
         >
@@ -189,7 +192,8 @@ function TimerControl({
         </button>
         <button
           onClick={() => onCommand({ type: "cmd", action: resetAction })}
-          className="grid h-14 place-items-center rounded-2xl border border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer active:scale-95"
+          disabled={disabled}
+          className="grid h-14 place-items-center rounded-2xl border border-zinc-700 text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
           title={isEn ? "Reset Timer" : "ٹائمر دوبارہ ترتیب دیں"}
         >
           <RotateCcw className="h-5 w-5" />
@@ -203,8 +207,9 @@ function TimerControl({
             onClick={() =>
               onCommand({ type: "cmd", action: "setDuration", key: durationKey, minutes: m })
             }
+            disabled={disabled}
             className={cn(
-              "rounded-full border px-3.5 py-2 text-xs font-bold transition-all cursor-pointer active:scale-95",
+              "rounded-full border px-3.5 py-2 text-xs font-bold transition-all cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-40",
               slice && total === toSeconds(m)
                 ? cn("border-0", a.activeChip)
                 : "border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500",
@@ -232,6 +237,22 @@ function RemotePage() {
   const [members, setMembers] = useState<RoomMember[]>([]);
   const [status, setStatus] = useState("connecting");
   const [error, setError] = useState<RemoteError | null>(null);
+  const [stale, setStale] = useState(false);
+  const [freshTick, setFreshTick] = useState(0);
+  const [optimistic, setOptimistic] = useState<{
+    session?: boolean;
+    qa?: boolean;
+    turn?: boolean;
+  }>({});
+
+  // Refs hold the latest values so timers/listeners never read a stale closure.
+  const lastStateAt = useRef<number | null>(null);
+  const roomHandleRef = useRef<RemoteRoom | null>(null);
+  const statusRef = useRef("connecting");
+  const staleRef = useRef(false);
+  const lastReconnectAt = useRef(0);
+  const lastToggleAt = useRef<Record<string, number>>({});
+  const pendingRef = useRef<RemoteCommand[]>([]);
 
   // Compute client-only state after mount so SSR and client HTML match
   // (avoids React hydration errors that can break event wiring on some phones).
@@ -247,15 +268,25 @@ function RemotePage() {
     setState(null);
     setStatus("connecting");
     setError(null);
+    setStale(false);
+    lastStateAt.current = null;
     openRemoteRoom(room, "remote", {
       onState: (s) => {
-        if (!cancelled) setState(s);
+        if (cancelled) return;
+        lastStateAt.current = Date.now();
+        staleRef.current = false;
+        setStale(false);
+        setState(s);
+        setOptimistic({});
+        setFreshTick((n) => n + 1);
       },
       onMembers: (m) => {
         if (!cancelled) setMembers(m);
       },
       onConnectionState: (s) => {
-        if (!cancelled) setStatus(s);
+        if (cancelled) return;
+        statusRef.current = s;
+        setStatus(s);
       },
       onError: (e) => {
         if (!cancelled) setError(e);
@@ -266,6 +297,7 @@ function RemotePage() {
         return;
       }
       handle = opened;
+      roomHandleRef.current = opened;
       setRoomHandle(opened);
       if (!opened) setStatus("not-configured");
       if (opened) saveRecentRoom(room);
@@ -273,6 +305,7 @@ function RemotePage() {
     return () => {
       cancelled = true;
       handle?.close();
+      roomHandleRef.current = null;
       setRoomHandle(null);
       setMembers([]);
     };
@@ -280,20 +313,93 @@ function RemotePage() {
 
   const hasHost = members.some((m) => m.role === "host");
   const connected = status === "connected";
-  const connecting = !connected && status !== "failed" && !error;
-  const failed = error !== null || status === "failed";
+  const failed = (error !== null && error.fatal) || status === "failed";
+  const connecting = !connected && !failed;
   // A state message only ever comes from the host, so treat it as proof the
-  // host is paired even if presence membership is momentarily stale.
-  const hostOnline = connected && (hasHost || state !== null);
+  // host is paired even if presence membership is momentarily stale. The
+  // handle must also exist so queued commands have a real channel to send on.
+  const hostOnline = connected && roomHandle !== null && (hasHost || state !== null);
 
-  // Commands sent while the host is offline are buffered and flushed on connect,
-  // so "will apply as soon as it comes online" is actually true.
-  const pendingRef = useRef<RemoteCommand[]>([]);
+  // Force a fresh Ably socket when the link has gone stale (e.g. the phone tab
+  // was suspended). Throttled so a flapping connection can't thrash reconnect.
+  const tryReconnect = useCallback(() => {
+    const now = Date.now();
+    if (now - lastReconnectAt.current < 8000) return;
+    lastReconnectAt.current = now;
+    roomHandleRef.current?.reconnect();
+  }, []);
+  const tryReconnectRef = useRef(tryReconnect);
+  tryReconnectRef.current = tryReconnect;
+
+  // Stale-state watchdog: the host broadcasts every 2s, so silence for >6s
+  // means the link is dead. Surface it and kick a reconnect.
+  useEffect(() => {
+    if (!room) return;
+    const id = window.setInterval(() => {
+      const last = lastStateAt.current;
+      if (last === null || document.hidden) return;
+      const isStale = Date.now() - last > 6000;
+      staleRef.current = isStale;
+      setStale(isStale);
+      if (isStale && statusRef.current === "connected") tryReconnectRef.current();
+    }, 2000);
+    return () => window.clearInterval(id);
+  }, [room]);
+
+  // iOS/mobile browsers suspend suspended tabs' sockets; reconnect when the
+  // user returns so the remote isn't left silently dead.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const last = lastStateAt.current;
+      if (last === null || Date.now() - last > 6000) tryReconnectRef.current();
+    };
+    const onFocus = () => {
+      const last = lastStateAt.current;
+      if (last !== null && Date.now() - last > 6000) tryReconnectRef.current();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
+
+  const TOGGLE_ACTIONS = new Set(["toggleSession", "toggleQa", "toggleTurn"]);
+  const TOGGLE_KEY = { toggleSession: "session", toggleQa: "qa", toggleTurn: "turn" } as const;
+
+  const effectiveActive = (key: "session" | "qa" | "turn"): boolean => {
+    const o = optimistic[key];
+    if (o !== undefined) return o;
+    const s = state?.[key];
+    return s ? s.active : false;
+  };
+
+  // Commands sent while the host is offline or the link is stale are buffered
+  // and flushed once the link is healthy again. Toggles are idempotent, so a
+  // duplicate pending toggle cancels the previous one (two toggles = no-op).
   const send = (cmd: RemoteCommand) => {
-    if (hostOnline && roomHandle) {
+    if (cmd.type === "cmd") {
+      const key = TOGGLE_KEY[cmd.action as keyof typeof TOGGLE_KEY];
+      if (key) {
+        // Optimistic feedback: flip the card immediately so the user doesn't
+        // tap twice while the host's state echo is up to 2s away.
+        setOptimistic((o) => ({ ...o, [key]: !effectiveActive(key) }));
+        const now = Date.now();
+        if (now - (lastToggleAt.current[cmd.action] ?? 0) < 800) return;
+        lastToggleAt.current[cmd.action] = now;
+      }
+    }
+    if (hostOnline && roomHandle && !staleRef.current) {
       roomHandle.publish(cmd);
     } else {
-      pendingRef.current.push(cmd);
+      const pending = pendingRef.current;
+      if (cmd.type === "cmd" && TOGGLE_ACTIONS.has(cmd.action)) {
+        const idx = pending.findIndex((c) => c.type === "cmd" && c.action === cmd.action);
+        if (idx >= 0) pending.splice(idx, 1);
+      }
+      pending.push(cmd);
     }
   };
 
@@ -302,7 +408,16 @@ function RemotePage() {
     const pending = pendingRef.current;
     pendingRef.current = [];
     for (const cmd of pending) roomHandle.publish(cmd);
-  }, [hostOnline, roomHandle]);
+  }, [hostOnline, roomHandle, freshTick]);
+
+  // Host state, with any optimistic toggle applied so the card flips instantly
+  // instead of waiting up to 2s for the host's echo.
+  const effSlice = (key: "session" | "qa" | "turn"): RemoteState["session"] | undefined => {
+    const base = state?.[key];
+    if (!base) return undefined;
+    const o = optimistic[key];
+    return o === undefined ? base : { ...base, active: o };
+  };
 
   const connect = (code: string) => {
     const normalized = normalizeRoom(code);
@@ -402,10 +517,16 @@ function RemotePage() {
             <div
               className={cn(
                 "flex items-center justify-center gap-1.5 text-[11px] font-semibold",
-                failed ? "text-red-400" : hostOnline ? "text-emerald-400" : "text-amber-400",
+                failed
+                  ? "text-red-400"
+                  : stale
+                    ? "text-amber-400"
+                    : hostOnline
+                      ? "text-emerald-400"
+                      : "text-amber-400",
               )}
             >
-              {hostOnline || connecting ? (
+              {!stale && (hostOnline || connecting) ? (
                 <Wifi className="h-3 w-3" />
               ) : (
                 <WifiOff className="h-3 w-3" />
@@ -414,17 +535,21 @@ function RemotePage() {
                 ? isEn
                   ? "Connection failed"
                   : "رابطہ ناکام"
-                : connecting
+                : stale
                   ? isEn
-                    ? "Connecting…"
-                    : "منسلک ہو رہا ہے…"
-                  : hostOnline
+                    ? "Reconnecting to host…"
+                    : "میزبان سے دوبارہ منسلک ہو رہا ہے…"
+                  : connecting
                     ? isEn
-                      ? "Host connected"
-                      : "میزبان منسلک"
-                    : isEn
-                      ? "Waiting for host…"
-                      : "میزبان کا انتظار…"}
+                      ? "Connecting…"
+                      : "منسلک ہو رہا ہے…"
+                    : hostOnline
+                      ? isEn
+                        ? "Host connected"
+                        : "میزبان منسلک"
+                      : isEn
+                        ? "Waiting for host…"
+                        : "میزبان کا انتظار…"}
             </div>
           </div>
           <button
@@ -446,7 +571,16 @@ function RemotePage() {
           </div>
         )}
 
-        {configured && !hostOnline && (
+        {stale && (
+          <div className="flex items-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+            <WifiOff className="h-5 w-5 shrink-0" />
+            {isEn
+              ? "The link to the host is momentarily lost. Reconnecting — your commands will be sent as soon as it's back."
+              : "میزبان سے لنک عارضی طور پر ختم ہو گیا ہے۔ دوبارہ منسلک ہو رہا ہے — دوبارہ آنے پر آپ کے احکامات بھیج دیے جائیں گے۔"}
+          </div>
+        )}
+
+        {!stale && configured && !hostOnline && (
           <div
             className={cn(
               "flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm",
@@ -469,40 +603,44 @@ function RemotePage() {
         <TimerControl
           label={isEn ? "Session Reading" : "سیشن"}
           icon={Clock}
-          slice={state?.session}
+          slice={effSlice("session")}
           presets={SESSION_PRESETS}
           durationKey="session"
           accent="amber"
           lang={lang}
+          disabled={connecting || stale}
           onCommand={send}
         />
         <TimerControl
           label={isEn ? "Q&A" : "سوال و جواب"}
           icon={MessageSquare}
-          slice={state?.qa}
+          slice={effSlice("qa")}
           presets={QA_PRESETS}
           durationKey="qa"
           accent="blue"
           lang={lang}
+          disabled={connecting || stale}
           onCommand={send}
         />
         {state?.supportsTurn !== false && (
           <TimerControl
             label={isEn ? "Turn" : "ٹرن"}
             icon={Hourglass}
-            slice={state?.turn}
+            slice={effSlice("turn")}
             presets={TURN_PRESETS}
             durationKey="turn"
             accent="emerald"
             lang={lang}
+            disabled={connecting || stale}
             onCommand={send}
           />
         )}
 
         <button
           onClick={() => send({ type: "cmd", action: "toggleSound" })}
+          disabled={connecting || stale}
           className={cn(
-            "flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-4 text-sm font-bold transition-all cursor-pointer active:scale-95",
+            "flex w-full items-center justify-center gap-2 rounded-2xl border px-4 py-4 text-sm font-bold transition-all cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-40",
             state?.soundEnabled
               ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
               : "border-zinc-700 text-zinc-400",

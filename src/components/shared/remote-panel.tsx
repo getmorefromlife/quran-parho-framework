@@ -69,40 +69,48 @@ export function RemotePanel({
         <div
           className={cn(
             "mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold",
-            error
+            error?.fatal
               ? "border-red-500/50 bg-red-500/10 text-red-400"
-              : status === "connected"
-                ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
-                : status === "not-configured"
-                  ? "border-red-500/50 bg-red-500/10 text-red-400"
-                  : "border-amber-500/50 bg-amber-500/10 text-amber-400",
+              : error
+                ? "border-amber-500/50 bg-amber-500/10 text-amber-400"
+                : status === "connected"
+                  ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
+                  : status === "not-configured"
+                    ? "border-red-500/50 bg-red-500/10 text-red-400"
+                    : "border-amber-500/50 bg-amber-500/10 text-amber-400",
           )}
         >
           <span
             className={cn(
               "h-2 w-2 rounded-full",
-              error
+              error?.fatal
                 ? "bg-red-400"
-                : status === "connected"
-                  ? "bg-emerald-400"
-                  : "bg-amber-400 animate-pulse",
+                : error
+                  ? "bg-amber-400 animate-pulse"
+                  : status === "connected"
+                    ? "bg-emerald-400"
+                    : "bg-amber-400 animate-pulse",
             )}
           />
-          {error
+          {error?.fatal
             ? isEn
               ? ERROR_TEXT[error.kind]
               : "رابطہ ناکام"
-            : status === "connected"
+            : error
               ? isEn
-                ? "Connected — ready to pair"
-                : "منسلک — جوڑنے کے لیے تیار"
-              : status === "not-configured"
+                ? "Link unstable — reconnecting…"
+                : "لنک غیر مستحکم — دوبارہ منسلک ہو رہا ہے…"
+              : status === "connected"
                 ? isEn
-                  ? "Remote not configured (missing key)"
-                  : "ریموٹ ترتیب نہیں ہے (کلید غائب)"
-                : isEn
-                  ? "Connecting…"
-                  : "منسلک ہو رہا ہے…"}
+                  ? "Connected — ready to pair"
+                  : "منسلک — جوڑنے کے لیے تیار"
+                : status === "not-configured"
+                  ? isEn
+                    ? "Remote not configured (missing key)"
+                    : "ریموٹ ترتیب نہیں ہے (کلید غائب)"
+                  : isEn
+                    ? "Connecting…"
+                    : "منسلک ہو رہا ہے…"}
         </div>
 
         {isLocalhost && (

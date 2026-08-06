@@ -40,12 +40,15 @@ export type RemoteRoomEvents = {
   onCommand?: (command: RemoteCommand) => void;
   onMembers?: (members: RoomMember[]) => void;
   onConnectionState?: (state: string) => void;
-  onError?: (error: RemoteError) => void;
+  onError?: (error: RemoteError | null) => void;
 };
 
 export type RemoteRoom = {
   room: string;
   publish: (msg: RemoteMessage) => void;
+  /** Force the underlying connection to tear down and re-establish (useful after
+   * a mobile tab has been suspended and its socket went stale). */
+  reconnect: () => void;
   close: () => void;
 };
 
@@ -144,7 +147,13 @@ export async function openRemoteRoom(
 
   realtime.connection.on((change) => {
     events.onConnectionState?.(change.current);
-    if (change.current === "failed" || (change.current === "disconnected" && change.reason)) {
+    if (change.current === "connected") {
+      // Clear any transient (non-fatal) link errors on recovery.
+      events.onError?.(null);
+    } else if (
+      change.current === "failed" ||
+      (change.current === "disconnected" && change.reason)
+    ) {
       events.onError?.(describeError(change.reason));
     }
   });
@@ -158,12 +167,24 @@ export async function openRemoteRoom(
   void refreshMembers();
 
   const publish = (msg: RemoteMessage) => {
-    void channel.publish("msg", msg).catch(() => undefined);
+    void channel.publish("msg", msg).catch((e) => events.onError?.(describeError(e)));
+  };
+
+  // Force a fresh socket when the current one may be stale (e.g. the tab was
+  // suspended on a phone). `close()` then `connect()` is the documented way to
+  // make the SDK reopen even when it believes it is still connected.
+  const reconnect = () => {
+    realtime.connection.close();
+    realtime.connect();
+    void channel.attach().catch((e) => events.onError?.(describeError(e)));
+    void channel.presence.enter({ role }).catch((e) => events.onError?.(describeError(e)));
+    void refreshMembers();
   };
 
   return {
     room,
     publish,
+    reconnect,
     close: () => {
       void channel.presence.leave().catch(() => undefined);
       channel.detach();
