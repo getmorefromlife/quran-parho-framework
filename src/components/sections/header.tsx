@@ -29,12 +29,24 @@ export function Header() {
     "nav_explorer",
     "nav_themes",
     "nav_share",
+    "nav_howto",
     "nav_guide",
     "nav_kit",
     "nav_ai",
     "nav_tools",
   ];
-  const anchors = ["about", "cycles", "explorer", "themes", "share", "guide", "kit", "ai", "tools"];
+  const anchors = [
+    "about",
+    "cycles",
+    "explorer",
+    "themes",
+    "share",
+    "howto",
+    "guide",
+    "kit",
+    "ai",
+    "tools",
+  ];
 
   return (
     <>

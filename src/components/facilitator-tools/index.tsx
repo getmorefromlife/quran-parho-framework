@@ -85,8 +85,8 @@ export function FacilitatorTools({
           </button>
           <p className="text-xs sm:text-sm text-muted-foreground text-center max-w-md">
             {lang === "en"
-              ? "Present just the Session & Q&A timers on a big fullscreen screen — ideal when reading from a physical Qurʼān."
-              : "صرف سیشن اور سوال و جواب کے ٹائمر بڑی فل اسکرین پر دکھائیں — فزیکل قرآن پڑھتے وقت بہترین۔"}
+              ? "Present just the Session & Q&A timers on a big fullscreen screen — ideal when reading from a physical Qurʼān. Once launched, pair your phone via the QR code to control the timers remotely."
+              : "صرف سیشن اور سوال و جواب کے ٹائمر بڑی فل اسکرین پر دکھائیں — فزیکل قرآن پڑھتے وقت بہترین۔ شروع کرنے کے بعد QR کوڈ سے فون جوڑ کر ٹائمرز دور سے کنٹرول کریں۔"}
           </p>
         </div>
 

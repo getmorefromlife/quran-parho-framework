@@ -1,14 +1,5 @@
 import { useState, type FormEvent } from "react";
-import {
-  Mail,
-  Copy,
-  Check,
-  Users,
-  MessageSquare,
-  ExternalLink,
-  HeartHandshake,
-  Sparkles,
-} from "lucide-react";
+import { Mail, Copy, Check, Users, HeartHandshake, Sparkles } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,9 +9,6 @@ import { cn } from "@/lib/utils";
 // Official contact & feedback email address
 export const CONTACT_EMAIL = "getmorefromlife@gmail.com";
 
-// Optional WhatsApp Community / Group Invite link
-export const WHATSAPP_COMMUNITY_LINK = "https://chat.whatsapp.com/";
-
 export function Contact() {
   const { lang } = useLang();
   const [name, setName] = useState("");
@@ -28,7 +16,7 @@ export function Contact() {
   const [length, setLength] = useState<"1h" | "2h">("1h");
   const [note, setNote] = useState("");
   const [copied, setCopied] = useState(false);
-  const [contactMethod, setContactMethod] = useState<"email" | "copy" | "community">("email");
+  const [contactMethod, setContactMethod] = useState<"email" | "copy">("email");
 
   const buildSummary = () => {
     const lines = [
@@ -91,7 +79,7 @@ export function Contact() {
           </h2>
           <p className="mt-3 text-muted-foreground">
             {lang === "en"
-              ? "Fill in your details below to send a registration request via Email, join our public Community group, or copy your registration details."
+              ? "Fill in your details below to send a registration request via Email, or copy your registration details."
               : "اپنی تفصیلات درج کریں اور ای میل یا نجی پیغام کے ذریعے اپنے محلے کے حلقے کی درخواست بھیجیں۔"}
           </p>
         </div>
@@ -162,20 +150,6 @@ export function Contact() {
             >
               <Copy className="h-3.5 w-3.5" />
               {lang === "en" ? "Copy Request Card" : "درخواست کاپی کریں"}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setContactMethod("community")}
-              className={cn(
-                "px-4 py-2 rounded-full text-xs font-semibold border transition-all flex items-center gap-1.5",
-                contactMethod === "community"
-                  ? "bg-gold/10 text-gold border-gold/40 shadow-gold"
-                  : "border-border text-muted-foreground hover:border-gold/30",
-              )}
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-              {lang === "en" ? "Community Group" : "کمیونٹی گروپ"}
             </button>
           </div>
 
@@ -276,17 +250,6 @@ export function Contact() {
                   : lang === "en"
                     ? "Copy Registration Details"
                     : "درخواست کی تفصیلات کاپی کریں"}
-              </Button>
-            )}
-
-            {contactMethod === "community" && (
-              <Button
-                type="button"
-                onClick={() => window.open(WHATSAPP_COMMUNITY_LINK, "_blank")}
-                className="mt-4 w-full bg-emerald-gradient text-gold border border-gold/40 h-12 text-base font-semibold"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                {lang === "en" ? "Join Public Community Group" : "پبلک کمیونٹی گروپ میں شامل ہوں"}
               </Button>
             )}
           </form>

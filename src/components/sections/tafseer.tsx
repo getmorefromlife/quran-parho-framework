@@ -3,7 +3,7 @@ import { useLang } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 
 export function TafseerResources() {
-  const { lang } = useLang();
+  const { tr } = useLang();
   const groups = [
     {
       label: "Multilingual",
@@ -43,17 +43,10 @@ export function TafseerResources() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="text-center max-w-2xl mx-auto">
           <Badge className="bg-gold/20 text-gold border-gold/40 px-3">
-            <BookOpen className="h-3 w-3" />{" "}
-            {lang === "en" ? "Tafseer Resources" : "تفاسیر کے لنکس"}
+            <BookOpen className="h-3 w-3" /> {tr("tafseer_badge")}
           </Badge>
-          <h2 className="mt-4 text-3xl sm:text-4xl font-bold">
-            {lang === "en" ? "Online Tafseer Portal" : "آن لائن تفسیر پورٹل"}
-          </h2>
-          <p className="mt-3 text-muted-foreground">
-            {lang === "en"
-              ? "Curated links to trusted tafseer resources across languages."
-              : "مختلف زبانوں میں مستند تفاسیر کے لنکس"}
-          </p>
+          <h2 className="mt-4 text-3xl sm:text-4xl font-bold">{tr("tafseer_title")}</h2>
+          <p className="mt-3 text-muted-foreground">{tr("tafseer_sub")}</p>
         </div>
 
         <div className="mt-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">

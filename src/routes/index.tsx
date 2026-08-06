@@ -164,7 +164,7 @@ function Page() {
   const navItems = [
     { key: "nav_about", anchor: "about", icon: Compass },
     { key: "nav_cycles", anchor: "cycles", icon: Layers },
-    { key: "nav_explorer", anchor: "session", icon: ScrollText },
+    { key: "nav_explorer", anchor: "explorer", icon: ScrollText },
     { key: "nav_themes", anchor: "themes", icon: Library },
     { key: "nav_share", anchor: "share", icon: Share2 },
     { key: "nav_howto", anchor: "howto", icon: StickyNote },

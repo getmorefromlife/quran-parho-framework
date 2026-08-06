@@ -1,3 +1,5 @@
+import { getTranslationText } from "@/lib/translations";
+
 const KEY_HIGHLIGHTS = "qp_highlights";
 const KEY_VERSE_NOTES = "qp_verse_notes";
 const KEY_SHARE_PREFS = "qp_share_prefs";
@@ -146,7 +148,7 @@ export function composeShareText(
   if (selectedTranslations && selectedTranslations.length > 0) {
     // Use selected translations with their labels
     for (const tid of selectedTranslations) {
-      const text = v[tid] as string | undefined;
+      const text = getTranslationText(v, tid);
       if (!text) continue;
       // Import would be circular; use inline label map
       const labels: Record<string, string> = {

@@ -93,7 +93,9 @@ export function Hero() {
           <div className="absolute -inset-6 bg-gold/20 blur-3xl rounded-full" />
           <div className="relative rounded-3xl border border-gold/40 bg-card/60 backdrop-blur-xl p-5 sm:p-6 shadow-elegant glow-pulse max-w-md mx-auto lg:max-w-none">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-[0.2em] text-gold">Blueprint</span>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-gold">
+                {tr("hero_stat_blueprint")}
+              </span>
               <Sparkles className="h-4 w-4 text-gold" />
             </div>
 
@@ -107,9 +109,9 @@ export function Hero() {
 
             <div className="mt-3 grid grid-cols-3 gap-2 text-center">
               {[
-                { l: "Cycles", v: "3" },
-                { l: "Verses/turn", v: "5" },
-                { l: "Q&A", v: "<2m" },
+                { l: tr("hero_stat_cycles"), v: "3" },
+                { l: tr("hero_stat_verses"), v: "5" },
+                { l: tr("hero_stat_qa"), v: "<2m" },
               ].map((s) => (
                 <div key={s.l} className="rounded-xl border border-border bg-background/60 p-2.5">
                   <div className="font-serif-display text-xl text-gold">{s.v}</div>
