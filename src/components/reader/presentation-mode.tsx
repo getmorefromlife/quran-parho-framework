@@ -49,6 +49,8 @@ export type PresentationModeProps = {
   surahAr: string;
   onNavigateAyah: (ayah: number) => void;
   onNavigateSurah: (n: number) => void;
+  onNextTurn?: () => void;
+  onPrevTurn?: () => void;
   audioPlaying: boolean;
   onToggleAudio: (ayah: number) => void;
   onClose: () => void;
@@ -154,6 +156,8 @@ export function PresentationMode({
   surahAr,
   onNavigateAyah,
   onNavigateSurah,
+  onNextTurn,
+  onPrevTurn,
   audioPlaying,
   onToggleAudio,
   onClose,
@@ -211,8 +215,11 @@ export function PresentationMode({
   const turnBlockVerses = verses.filter((v) => v.ayah >= blockStart && v.ayah <= blockEnd);
 
   const activeVerse = verses.find((v) => v.ayah === currentAyah) || verses[0];
-  const hasPrev = currentAyah > 1 || surahN > 1;
-  const hasNext = currentAyah < maxVerses || surahN < 114;
+  const isCircle = turnNumber != null && totalTurns != null;
+  const hasPrev = isCircle ? turnNumber > 1 || surahN > 1 : currentAyah > 1 || surahN > 1;
+  const hasNext = isCircle
+    ? turnNumber < totalTurns || surahN < 114
+    : currentAyah < maxVerses || surahN < 114;
 
   const currentTheme = THEMES[themeStyle];
 
@@ -343,9 +350,15 @@ export function PresentationMode({
     }
   };
 
-  // Navigate next verse / next block
+  // Navigate next verse / next block / next turn
   const handleNext = useCallback(() => {
-    if (viewMode === "turn_block") {
+    if (isCircle) {
+      if (onNextTurn && turnNumber < (totalTurns ?? 0)) {
+        onNextTurn();
+      } else if (surahN < 114) {
+        onNavigateSurah(surahN + 1);
+      }
+    } else if (viewMode === "turn_block") {
       if (blockEnd < maxVerses) {
         onNavigateAyah(Math.min(blockEnd + 1, maxVerses));
       } else if (surahN < 114) {
@@ -356,11 +369,29 @@ export function PresentationMode({
     } else if (surahN < 114) {
       onNavigateSurah(surahN + 1);
     }
-  }, [viewMode, blockEnd, maxVerses, currentAyah, surahN, onNavigateAyah, onNavigateSurah]);
+  }, [
+    isCircle,
+    onNextTurn,
+    turnNumber,
+    totalTurns,
+    surahN,
+    viewMode,
+    blockEnd,
+    maxVerses,
+    currentAyah,
+    onNavigateAyah,
+    onNavigateSurah,
+  ]);
 
-  // Navigate prev verse / previous block
+  // Navigate prev verse / previous block / previous turn
   const handlePrev = useCallback(() => {
-    if (viewMode === "turn_block") {
+    if (isCircle) {
+      if (onPrevTurn && turnNumber > 1) {
+        onPrevTurn();
+      } else if (surahN > 1) {
+        onNavigateSurah(surahN - 1);
+      }
+    } else if (viewMode === "turn_block") {
       if (blockStart > 1) {
         onNavigateAyah(Math.max(blockStart - 5, 1));
       } else if (surahN > 1) {
@@ -371,7 +402,17 @@ export function PresentationMode({
     } else if (surahN > 1) {
       onNavigateSurah(surahN - 1);
     }
-  }, [viewMode, blockStart, currentAyah, surahN, onNavigateAyah, onNavigateSurah]);
+  }, [
+    isCircle,
+    onPrevTurn,
+    turnNumber,
+    surahN,
+    viewMode,
+    blockStart,
+    currentAyah,
+    onNavigateAyah,
+    onNavigateSurah,
+  ]);
 
   // Keyboard navigation & remote control listeners
   useEffect(() => {
@@ -928,6 +969,7 @@ export function PresentationMode({
                         "p-5 sm:p-6 rounded-2xl border transition-all",
                         currentTheme.border,
                         currentTheme.cardBg,
+                        v.ayah === currentAyah && "ring-2 ring-amber-400/70 shadow-gold",
                       )}
                     >
                       {contentMode === "translation_only" ? (

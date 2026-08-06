@@ -952,6 +952,16 @@ export function SurahReader({
             }
           }}
           onNavigateSurah={(sN) => onNavigate(sN)}
+          onNextTurn={() => {
+            const next = Math.min(circleTurn + 1, totalTurns);
+            setCircleTurn(next);
+            setSelectedVerse((next - 1) * chunkSize + 1);
+          }}
+          onPrevTurn={() => {
+            const prev = Math.max(circleTurn - 1, 1);
+            setCircleTurn(prev);
+            setSelectedVerse((prev - 1) * chunkSize + 1);
+          }}
           audioPlaying={audioPlaying}
           onToggleAudio={(aN) => togglePlay(aN)}
           onClose={() => setShowPresentationMode(false)}
