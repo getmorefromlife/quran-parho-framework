@@ -225,13 +225,20 @@ function RemotePage() {
   const isEn = lang === "en";
 
   const [inputRoom, setInputRoom] = useState("");
-  const [recentRooms, setRecentRooms] = useState<string[]>(() => loadRecentRooms());
-  const [configured] = useState(() => isRemoteConfigured());
+  const [recentRooms, setRecentRooms] = useState<string[]>([]);
+  const [configured, setConfigured] = useState(false);
   const [roomHandle, setRoomHandle] = useState<RemoteRoom | null>(null);
   const [state, setState] = useState<RemoteState | null>(null);
   const [members, setMembers] = useState<RoomMember[]>([]);
   const [status, setStatus] = useState("connecting");
   const [error, setError] = useState<RemoteError | null>(null);
+
+  // Compute client-only state after mount so SSR and client HTML match
+  // (avoids React hydration errors that can break event wiring on some phones).
+  useEffect(() => {
+    setConfigured(isRemoteConfigured());
+    setRecentRooms(loadRecentRooms());
+  }, []);
 
   useEffect(() => {
     if (!room) return;
