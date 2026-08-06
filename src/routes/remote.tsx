@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Pause,
   Play,
+  RefreshCw,
   RotateCcw,
   Smartphone,
   Volume2,
@@ -321,10 +322,11 @@ function RemotePage() {
   const hostOnline = connected && roomHandle !== null && (hasHost || state !== null);
 
   // Force a fresh Ably socket when the link has gone stale (e.g. the phone tab
-  // was suspended). Throttled so a flapping connection can't thrash reconnect.
-  const tryReconnect = useCallback(() => {
+  // was suspended). Throttled so a flapping connection can't thrash reconnect;
+  // the manual "Reconnect now" button bypasses the throttle.
+  const tryReconnect = useCallback((force = false) => {
     const now = Date.now();
-    if (now - lastReconnectAt.current < 8000) return;
+    if (!force && now - lastReconnectAt.current < 8000) return;
     lastReconnectAt.current = now;
     roomHandleRef.current?.reconnect();
   }, []);
@@ -572,11 +574,22 @@ function RemotePage() {
         )}
 
         {stale && (
-          <div className="flex items-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
-            <WifiOff className="h-5 w-5 shrink-0" />
-            {isEn
-              ? "The link to the host is momentarily lost. Reconnecting — your commands will be sent as soon as it's back."
-              : "میزبان سے لنک عارضی طور پر ختم ہو گیا ہے۔ دوبارہ منسلک ہو رہا ہے — دوبارہ آنے پر آپ کے احکامات بھیج دیے جائیں گے۔"}
+          <div className="flex flex-col items-stretch gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+            <div className="flex items-center gap-3">
+              <WifiOff className="h-5 w-5 shrink-0" />
+              <span>
+                {isEn
+                  ? "The link to the host is momentarily lost. Reconnecting — your commands will be sent as soon as it's back."
+                  : "میزبان سے لنک عارضی طور پر ختم ہو گیا ہے۔ دوبارہ منسلک ہو رہا ہے — دوبارہ آنے پر آپ کے احکامات بھیجے جائیں گے۔"}
+              </span>
+            </div>
+            <button
+              onClick={() => tryReconnectRef.current(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold text-zinc-950 hover:bg-amber-400 transition-all cursor-pointer active:scale-95"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {isEn ? "Reconnect now" : "ابھی دوبارہ منسلک ہوں"}
+            </button>
           </div>
         )}
 

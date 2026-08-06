@@ -1,3 +1,4 @@
+import type { Realtime, RealtimeChannel } from "ably";
 import type { TimerDurations } from "@/lib/timer-durations";
 
 export type RemoteRole = "host" | "remote";
@@ -115,22 +116,22 @@ export async function openRemoteRoom(
   const key = getAblyKey();
   if (!key) return null;
 
-  const { Realtime } = await import("ably");
-  const clientId = `${role === "host" ? "host" : "remote"}-${crypto.randomUUID()}`;
-  const realtime = new Realtime({ key, clientId });
-  const channel = realtime.channels.get(`qp:${room}`);
+  const { Realtime: AblyRealtime } = await import("ably");
+  const makeClientId = () => `${role}-${crypto.randomUUID()}`;
 
-  channel.subscribe("msg", (msg) => {
+  const onMsg = (msg: { data?: unknown }) => {
     const data = msg.data as RemoteMessage;
     if (data.type === "state") events.onState?.(data);
     else if (data.type === "cmd") events.onCommand?.(data);
-  });
+  };
 
-  channel.presence.subscribe(() => {
-    void refreshMembers();
-  });
+  // Module-scoped so a reconnect() rebuild can swap in a fresh client without
+  // the returned handle (and its publish()) going stale.
+  let realtime: Realtime | null = null;
+  let channel: RealtimeChannel | null = null;
 
   const refreshMembers = async () => {
+    if (!channel) return;
     try {
       const present = await channel.presence.get();
       const members: RoomMember[] = present
@@ -145,50 +146,53 @@ export async function openRemoteRoom(
     }
   };
 
-  realtime.connection.on((change) => {
-    events.onConnectionState?.(change.current);
-    if (change.current === "connected") {
-      // Clear any transient (non-fatal) link errors on recovery.
-      events.onError?.(null);
-    } else if (
-      change.current === "failed" ||
-      (change.current === "disconnected" && change.reason)
-    ) {
-      events.onError?.(describeError(change.reason));
-    }
-  });
-
-  await channel.attach().catch((e) => {
-    events.onError?.(describeError(e));
-  });
-  await channel.presence.enter({ role }).catch((e) => {
-    events.onError?.(describeError(e));
-  });
-  void refreshMembers();
-
-  const publish = (msg: RemoteMessage) => {
-    void channel.publish("msg", msg).catch((e) => events.onError?.(describeError(e)));
+  const wireConnection = (client: Realtime) => {
+    client.connection.on((change) => {
+      events.onConnectionState?.(change.current);
+      if (change.current === "connected") {
+        // Clear any transient (non-fatal) link errors on recovery.
+        events.onError?.(null);
+      } else if (
+        change.current === "failed" ||
+        (change.current === "disconnected" && change.reason)
+      ) {
+        events.onError?.(describeError(change.reason));
+      }
+    });
   };
 
-  // Force a fresh socket when the current one may be stale (e.g. the tab was
-  // suspended on a phone). `close()` then `connect()` is the documented way to
-  // make the SDK reopen even when it believes it is still connected.
-  const reconnect = () => {
-    realtime.connection.close();
-    realtime.connect();
+  // Build (or rebuild, on reconnect) a brand-new connection. A fresh client
+  // guarantees a clean socket even after a mobile browser killed a suspended
+  // tab's WebSocket and the old SDK state went stale.
+  const connect = () => {
+    if (realtime) realtime.close();
+    realtime = new AblyRealtime({ key, clientId: makeClientId() });
+    channel = realtime.channels.get(`qp:${room}`);
+    channel.subscribe("msg", onMsg);
+    channel.presence.subscribe(() => {
+      void refreshMembers();
+    });
+    wireConnection(realtime);
     void channel.attach().catch((e) => events.onError?.(describeError(e)));
     void channel.presence.enter({ role }).catch((e) => events.onError?.(describeError(e)));
     void refreshMembers();
   };
 
+  connect();
+
   return {
     room,
-    publish,
-    reconnect,
+    publish: (msg: RemoteMessage) => {
+      if (channel)
+        void channel.publish("msg", msg).catch((e) => events.onError?.(describeError(e)));
+    },
+    reconnect: connect,
     close: () => {
-      void channel.presence.leave().catch(() => undefined);
-      channel.detach();
-      realtime.close();
+      if (channel) void channel.presence.leave().catch(() => undefined);
+      if (channel) channel.detach();
+      if (realtime) realtime.close();
+      channel = null;
+      realtime = null;
     },
   };
 }

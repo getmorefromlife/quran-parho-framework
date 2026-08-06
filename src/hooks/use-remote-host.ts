@@ -89,5 +89,24 @@ export function useRemoteHost({
     }
   });
 
+  // If the host's own connection gets stuck (not connected/connecting) for
+  // more than ~5s, force a fresh client so state broadcasts resume for the
+  // phone. Transient blips usually recover within a second, so this only fires
+  // on genuine stalls.
+  const stuckSince = useRef<number | null>(null);
+  useEffect(() => {
+    if (status === "connected" || status === "connecting" || status === "not-configured") {
+      stuckSince.current = null;
+      return;
+    }
+    if (status === "failed") return;
+    const now = Date.now();
+    if (stuckSince.current === null) stuckSince.current = now;
+    if (now - stuckSince.current > 5000) {
+      stuckSince.current = now;
+      room?.reconnect();
+    }
+  }, [status, room]);
+
   return { panelOpen, setPanelOpen, roomCode, status, members, error };
 }
