@@ -531,107 +531,110 @@ export function PresentationMode({
         </div>
 
         {/* Right: Projector Controls & Prominent Timers */}
-        <div className="flex items-center gap-1.5 flex-nowrap min-w-0 overflow-x-auto">
-          {/* Prominent Timers Bar */}
-          <div className="flex items-center bg-zinc-900/90 border border-zinc-800 rounded-xl p-1 gap-1">
-            {/* Session Timer (60m) */}
-            <button
-              onClick={() => {
-                setSessionActive((v) => !v);
-                if (!sessionActive && sessionTimer === 0) setSessionTimer(3600);
-              }}
-              className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer",
-                sessionActive
-                  ? "bg-amber-500 text-black shadow-sm"
-                  : "text-zinc-300 hover:text-white",
-              )}
-              title="1-Hour Session Timer (Click to Play/Pause)"
-            >
-              <Clock className="h-3.5 w-3.5" />
-              <span>{formatTimer(sessionTimer)}</span>
-            </button>
+        <div className="flex items-center gap-1.5 flex-nowrap min-w-0">
+          {/* Scrollable core controls (no popovers here to avoid clipping) */}
+          <div className="flex items-center gap-1.5 flex-nowrap flex-1 min-w-0 overflow-x-auto">
+            {/* Prominent Timers Bar */}
+            <div className="flex items-center bg-zinc-900/90 border border-zinc-800 rounded-xl p-1 gap-1">
+              {/* Session Timer (60m) */}
+              <button
+                onClick={() => {
+                  setSessionActive((v) => !v);
+                  if (!sessionActive && sessionTimer === 0) setSessionTimer(3600);
+                }}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer",
+                  sessionActive
+                    ? "bg-amber-500 text-black shadow-sm"
+                    : "text-zinc-300 hover:text-white",
+                )}
+                title="1-Hour Session Timer (Click to Play/Pause)"
+              >
+                <Clock className="h-3.5 w-3.5" />
+                <span>{formatTimer(sessionTimer)}</span>
+              </button>
 
-            {/* Q&A Timer (15m) */}
-            <button
-              onClick={() => {
-                setQaActive((v) => !v);
-                if (!qaActive && qaTimer === 0) setQaTimer(900);
-              }}
-              className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer",
-                qaActive ? "bg-blue-500 text-white shadow-sm" : "text-zinc-300 hover:text-white",
-              )}
-              title="Circle Q&A Timer (Click to Play/Pause)"
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-              <span>Q&A: {formatTimer(qaTimer)}</span>
-            </button>
+              {/* Q&A Timer (15m) */}
+              <button
+                onClick={() => {
+                  setQaActive((v) => !v);
+                  if (!qaActive && qaTimer === 0) setQaTimer(900);
+                }}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer",
+                  qaActive ? "bg-blue-500 text-white shadow-sm" : "text-zinc-300 hover:text-white",
+                )}
+                title="Circle Q&A Timer (Click to Play/Pause)"
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                <span>Q&A: {formatTimer(qaTimer)}</span>
+              </button>
 
-            {/* Turn Pace Timer (5m) */}
-            <button
-              onClick={() => {
-                setTimerActive((v) => !v);
-                if (!timerActive && timerSeconds === 0) setTimerSeconds(300);
-              }}
-              className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer",
-                timerActive
-                  ? "bg-emerald-500 text-white shadow-sm"
-                  : "text-zinc-300 hover:text-white",
-              )}
-              title="5-Minute Turn Pace Timer"
-            >
-              <Hourglass className="h-3.5 w-3.5" />
-              <span>Turn: {formatTimer(timerSeconds)}</span>
-            </button>
-          </div>
+              {/* Turn Pace Timer (5m) */}
+              <button
+                onClick={() => {
+                  setTimerActive((v) => !v);
+                  if (!timerActive && timerSeconds === 0) setTimerSeconds(300);
+                }}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer",
+                  timerActive
+                    ? "bg-emerald-500 text-white shadow-sm"
+                    : "text-zinc-300 hover:text-white",
+                )}
+                title="5-Minute Turn Pace Timer"
+              >
+                <Hourglass className="h-3.5 w-3.5" />
+                <span>Turn: {formatTimer(timerSeconds)}</span>
+              </button>
+            </div>
 
-          {/* Content Mode Switcher (Both vs Translation Only vs Arabic Only) */}
-          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
-            <button
-              onClick={() => setContentMode("both")}
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
-                contentMode === "both"
-                  ? "bg-amber-500 text-black shadow-sm"
-                  : "text-zinc-400 hover:text-white",
-              )}
-              title="Show Arabic & Translation"
-            >
-              <Languages className="h-3.5 w-3.5" />
-              <span className="hidden xl:inline">Both</span>
-            </button>
-            <button
-              onClick={() => setContentMode("translation_only")}
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
-                contentMode === "translation_only"
-                  ? "bg-amber-500 text-black shadow-sm"
-                  : "text-zinc-400 hover:text-white",
-              )}
-              title="Translation Only View (Focus on Understanding)"
-            >
-              <BookOpenText className="h-3.5 w-3.5" />
-              <span className="hidden xl:inline">Translation Only</span>
-            </button>
-            <button
-              onClick={() => setContentMode("arabic_only")}
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
-                contentMode === "arabic_only"
-                  ? "bg-amber-500 text-black shadow-sm"
-                  : "text-zinc-400 hover:text-white",
-              )}
-              title="Arabic Only View"
-            >
-              <Type className="h-3.5 w-3.5" />
-              <span className="hidden xl:inline">Arabic Only</span>
-            </button>
+            {/* Content Mode Switcher (Both vs Translation Only vs Arabic Only) */}
+            <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
+              <button
+                onClick={() => setContentMode("both")}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                  contentMode === "both"
+                    ? "bg-amber-500 text-black shadow-sm"
+                    : "text-zinc-400 hover:text-white",
+                )}
+                title="Show Arabic & Translation"
+              >
+                <Languages className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">Both</span>
+              </button>
+              <button
+                onClick={() => setContentMode("translation_only")}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                  contentMode === "translation_only"
+                    ? "bg-amber-500 text-black shadow-sm"
+                    : "text-zinc-400 hover:text-white",
+                )}
+                title="Translation Only View (Focus on Understanding)"
+              >
+                <BookOpenText className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">Translation Only</span>
+              </button>
+              <button
+                onClick={() => setContentMode("arabic_only")}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                  contentMode === "arabic_only"
+                    ? "bg-amber-500 text-black shadow-sm"
+                    : "text-zinc-400 hover:text-white",
+                )}
+                title="Arabic Only View"
+              >
+                <Type className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">Arabic Only</span>
+              </button>
+            </div>
           </div>
 
           {/* Translation Picker: Choose from all 40+ translations */}
-          <div className="relative">
+          <div className="relative shrink-0">
             <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
               <button
                 onClick={() => setShowTransPicker((v) => !v)}
@@ -716,7 +719,7 @@ export function PresentationMode({
           </div>
 
           {/* View Mode Switcher: 5-Verse Turn Block vs Single Verse */}
-          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
+          <div className="flex items-center shrink-0 bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
             <button
               onClick={() => setViewMode("turn_block")}
               className={cn(
@@ -746,7 +749,7 @@ export function PresentationMode({
           </div>
 
           {/* More Controls Popover (Theme, Font Sizes, Layout, Fullscreen) */}
-          <div className="relative">
+          <div className="relative shrink-0">
             <button
               onClick={() => setShowMore((v) => !v)}
               className={cn(
@@ -963,7 +966,7 @@ export function PresentationMode({
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="h-9 w-9 rounded-xl text-zinc-400 hover:text-red-400 hover:bg-red-500/10 cursor-pointer"
+            className="h-9 w-9 shrink-0 rounded-xl text-zinc-400 hover:text-red-400 hover:bg-red-500/10 cursor-pointer"
             title={lang === "en" ? "Exit Presentation Mode (Esc)" : "بند کریں"}
           >
             <X className="h-5 w-5" />
