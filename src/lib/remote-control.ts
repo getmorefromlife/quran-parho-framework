@@ -11,7 +11,8 @@ export type RemoteCommand =
   | { type: "cmd"; action: "toggleTurn" }
   | { type: "cmd"; action: "resetTurn" }
   | { type: "cmd"; action: "toggleSound" }
-  | { type: "cmd"; action: "setDuration"; key: keyof TimerDurations; minutes: number };
+  | { type: "cmd"; action: "setDuration"; key: keyof TimerDurations; minutes: number }
+  | { type: "cmd"; action: "requestState" };
 
 export type TimerSlice = { secs: number; active: boolean; total: number };
 
@@ -47,9 +48,7 @@ export type RemoteRoomEvents = {
 export type RemoteRoom = {
   room: string;
   publish: (msg: RemoteMessage) => void;
-  /** Recover a dead link. On the host this tears down and rebuilds the
-   * realtime socket; on the phone this forces an immediate poll of the
-   * REST channel (there is no socket to rebuild). */
+  /** Recover a dead link. Tears down and rebuilds the realtime socket for clean recovery. */
   reconnect: () => void;
   close: () => void;
 };
@@ -117,17 +116,11 @@ export async function openRemoteRoom(
   const key = getAblyKey();
   if (!key) return null;
 
-  // The host uses a realtime WebSocket (it has to push state every 1-2s and
-  // respond instantly to phone taps). The phone deliberately uses plain REST
-  // (HTTP) polling: mobile browsers suspend/kill long-lived WebSockets in the
-  // background, but ordinary HTTPS requests always recover on their own.
   return role === "host"
     ? openHostRoom(room, key, role, events)
-    : openRemotePollRoom(room, key, events);
+    : openRemoteRealtimeRoom(room, key, events);
 }
 
-const HOST_STATE_POLL_MS = 2000;
-const HOST_MEMBERS_POLL_MS = 5000;
 const HOST_PING_MS = 5000;
 const HOST_PING_FAILS = 2;
 
@@ -148,15 +141,13 @@ async function openHostRoom(
     else if (data.type === "cmd") events.onCommand?.(data);
   };
 
-  // Module-scoped so a reconnect() rebuild can swap in a fresh client without
-  // the returned handle (and its publish()) going stale.
   let realtime: Realtime | null = null;
   let channel: RealtimeChannel | null = null;
 
   const refreshMembers = async () => {
     if (!channel) return;
     try {
-      const present = await channel.presence.get();
+      const present = await channel.presence.get({ waitForSync: true });
       const members: RoomMember[] = present
         .map((p) => ({
           role: ((p.data as { role?: RemoteRole } | undefined)?.role ?? "remote") as RemoteRole,
@@ -173,7 +164,6 @@ async function openHostRoom(
     client.connection.on((change) => {
       events.onConnectionState?.(change.current);
       if (change.current === "connected") {
-        // Clear any transient (non-fatal) link errors on recovery.
         events.onError?.(null);
       } else if (
         change.current === "failed" ||
@@ -184,12 +174,14 @@ async function openHostRoom(
     });
   };
 
-  // Build (or rebuild, on reconnect) a brand-new connection. A fresh client
-  // guarantees a clean socket even after a mobile browser killed a suspended
-  // tab's WebSocket and the old SDK state went stale.
   const connect = () => {
     if (realtime) realtime.close();
-    realtime = new AblyRealtime({ key, clientId: makeClientId() });
+    realtime = new AblyRealtime({
+      key,
+      clientId: makeClientId(),
+      disconnectedRetryTimeout: 1500,
+      suspendedRetryTimeout: 3000,
+    });
     channel = realtime.channels.get(`qp:${room}`);
     channel.subscribe("msg", onMsg);
     channel.presence.subscribe(() => {
@@ -201,9 +193,6 @@ async function openHostRoom(
     void refreshMembers();
   };
 
-  // Liveness heartbeat: if the socket silently dies while the SDK still thinks
-  // it is connected, ping() rejects and we rebuild a fresh client so state
-  // broadcasts resume for the phone.
   let heartbeat: number | null = null;
   let pingFails = 0;
   const startHeartbeat = () => {
@@ -254,44 +243,30 @@ async function openHostRoom(
   };
 }
 
-// ──────────────────────── Phone: REST (HTTP) polling ───────────────────────
+// ──────────────────────── Phone: Realtime socket with immediate sync ───────────────────────
 
-async function openRemotePollRoom(
+async function openRemoteRealtimeRoom(
   room: string,
   key: string,
   events: RemoteRoomEvents,
 ): Promise<RemoteRoom> {
-  const { Rest: AblyRest } = await import("ably");
-  const rest = new AblyRest({ key, clientId: `remote-${crypto.randomUUID()}` });
-  const channel: Channel = rest.channels.get(`qp:${room}`);
+  const { Realtime: AblyRealtime } = await import("ably");
+  const makeClientId = () => `remote-${crypto.randomUUID()}`;
 
-  let stopped = false;
-  let everConnected = false;
+  let realtime: Realtime | null = null;
+  let channel: RealtimeChannel | null = null;
 
-  const fetchState = async () => {
-    if (stopped) return;
-    try {
-      const page = await channel.history({ limit: 1 });
-      if (stopped) return;
-      if (!everConnected) {
-        everConnected = true;
-        events.onConnectionState?.("connected");
-      }
-      events.onError?.(null);
-      const latest = page.items[0];
-      const data = latest?.data as RemoteMessage | undefined;
-      if (data?.type === "state") events.onState?.(data);
-    } catch (e) {
-      if (!stopped) events.onError?.(describeError(e));
-    }
+  const onMsg = (msg: { data?: unknown }) => {
+    const data = msg.data as RemoteMessage;
+    if (data.type === "state") events.onState?.(data);
+    else if (data.type === "cmd") events.onCommand?.(data);
   };
 
-  const fetchMembers = async () => {
-    if (stopped) return;
+  const refreshMembers = async () => {
+    if (!channel) return;
     try {
-      const page = await channel.presence.get();
-      if (stopped) return;
-      const members: RoomMember[] = page.items
+      const present = await channel.presence.get({ waitForSync: true });
+      const members: RoomMember[] = present
         .map((p) => ({
           role: ((p.data as { role?: RemoteRole } | undefined)?.role ?? "remote") as RemoteRole,
           clientId: p.clientId,
@@ -303,26 +278,66 @@ async function openRemotePollRoom(
     }
   };
 
-  const stateTimer = window.setInterval(fetchState, HOST_STATE_POLL_MS);
-  const membersTimer = window.setInterval(fetchMembers, HOST_MEMBERS_POLL_MS);
-  void fetchState();
-  void fetchMembers();
+  const wireConnection = (client: Realtime) => {
+    client.connection.on((change) => {
+      events.onConnectionState?.(change.current);
+      if (change.current === "connected") {
+        events.onError?.(null);
+      } else if (
+        change.current === "failed" ||
+        (change.current === "disconnected" && change.reason)
+      ) {
+        events.onError?.(describeError(change.reason));
+      }
+    });
+  };
+
+  const connect = () => {
+    if (realtime) realtime.close();
+    realtime = new AblyRealtime({
+      key,
+      clientId: makeClientId(),
+      disconnectedRetryTimeout: 1500,
+      suspendedRetryTimeout: 3000,
+    });
+    channel = realtime.channels.get(`qp:${room}`);
+    channel.subscribe("msg", onMsg);
+    channel.presence.subscribe(() => {
+      void refreshMembers();
+    });
+    wireConnection(realtime);
+
+    void channel
+      .attach()
+      .then(() => {
+        // Request state snapshot immediately on attach so host responds right away
+        void channel?.publish("msg", { type: "cmd", action: "requestState" });
+      })
+      .catch((e) => events.onError?.(describeError(e)));
+
+    void channel.presence
+      .enter({ role: "remote" })
+      .catch((e) => events.onError?.(describeError(e)));
+    void refreshMembers();
+  };
+
+  connect();
 
   return {
     room,
     publish: (msg: RemoteMessage) => {
-      void channel.publish("msg", msg).catch((e) => events.onError?.(describeError(e)));
+      if (channel)
+        void channel.publish("msg", msg).catch((e) => events.onError?.(describeError(e)));
     },
-    // No socket to rebuild — but kick an immediate poll so a manual retry (or
-    // the stale watchdog) re-syncs the phone without waiting for the next tick.
     reconnect: () => {
-      void fetchState();
-      void fetchMembers();
+      connect();
     },
     close: () => {
-      stopped = true;
-      window.clearInterval(stateTimer);
-      window.clearInterval(membersTimer);
+      if (channel) void channel.presence.leave().catch(() => undefined);
+      if (channel) channel.detach();
+      if (realtime) realtime.close();
+      channel = null;
+      realtime = null;
     },
   };
 }

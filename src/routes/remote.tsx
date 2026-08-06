@@ -328,6 +328,10 @@ function RemotePage() {
     const now = Date.now();
     if (!force && now - lastReconnectAt.current < 8000) return;
     lastReconnectAt.current = now;
+    if (force) {
+      staleRef.current = false;
+      setStale(false);
+    }
     roomHandleRef.current?.reconnect();
   }, []);
   const tryReconnectRef = useRef(tryReconnect);

@@ -10,11 +10,25 @@ import {
   type RoomMember,
 } from "@/lib/remote-control";
 
+const HOST_ROOM_STORAGE_KEY = "qp_host_room_code";
+
+function getStoredOrNewRoomCode(): string {
+  try {
+    const existing = sessionStorage.getItem(HOST_ROOM_STORAGE_KEY);
+    if (existing && existing.length >= 4) return existing;
+    const fresh = generateRoomCode();
+    sessionStorage.setItem(HOST_ROOM_STORAGE_KEY, fresh);
+    return fresh;
+  } catch {
+    return generateRoomCode();
+  }
+}
+
 /**
- * Host side of the phone-remote relay. Opens the room while `panelOpen` is
- * true, broadcasts the latest timer state every 2s and on every change, and
- * dispatches incoming commands to `onCommand`. The host machine stays the
- * single source of truth for countdowns.
+ * Host side of the phone-remote relay. Initializes the room connection on mount,
+ * broadcasts the latest timer state every 2s and on every change, and dispatches
+ * incoming commands to `onCommand`. The `panelOpen` state controls only the
+ * QR modal visibility on screen without killing the underlying socket relay.
  */
 export function useRemoteHost({
   getSnapshot,
@@ -24,7 +38,7 @@ export function useRemoteHost({
   onCommand: (cmd: RemoteCommand) => void;
 }) {
   const [panelOpen, setPanelOpen] = useState(false);
-  const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [roomCode] = useState<string>(() => getStoredOrNewRoomCode());
   const [status, setStatus] = useState("connecting");
   const [members, setMembers] = useState<RoomMember[]>([]);
   const [room, setRoom] = useState<RemoteRoom | null>(null);
@@ -34,22 +48,33 @@ export function useRemoteHost({
   snapshotRef.current = getSnapshot;
   const commandRef = useRef(onCommand);
   commandRef.current = onCommand;
+  const roomRef = useRef<RemoteRoom | null>(null);
 
+  // Initialize and maintain host room relay for the lifetime of this component
   useEffect(() => {
-    if (!panelOpen) return;
     if (!isRemoteConfigured()) {
       setStatus("not-configured");
       return;
     }
     let cancelled = false;
     let opened: RemoteRoom | null = null;
-    const code = generateRoomCode();
-    setRoomCode(code);
+
     setStatus("connecting");
     setError(null);
-    openRemoteRoom(code, "host", {
-      onCommand: (cmd) => commandRef.current(cmd),
-      onMembers: setMembers,
+    openRemoteRoom(roomCode, "host", {
+      onCommand: (cmd) => {
+        if (cmd.type === "cmd" && cmd.action === "requestState") {
+          const currentRoom = opened || roomRef.current;
+          if (currentRoom) currentRoom.publish(snapshotRef.current());
+          return;
+        }
+        commandRef.current(cmd);
+      },
+      onMembers: (m) => {
+        setMembers(m);
+        const currentRoom = opened || roomRef.current;
+        if (currentRoom) currentRoom.publish(snapshotRef.current());
+      },
       onConnectionState: setStatus,
       onError: setError,
     }).then((r) => {
@@ -58,16 +83,19 @@ export function useRemoteHost({
         return;
       }
       opened = r;
+      roomRef.current = r;
       setRoom(r);
       if (!r) setStatus("not-configured");
     });
+
     return () => {
       cancelled = true;
       opened?.close();
+      roomRef.current = null;
       setRoom(null);
       setMembers([]);
     };
-  }, [panelOpen]);
+  }, [roomCode]);
 
   // Broadcast a fresh snapshot immediately and every 2s while connected
   useEffect(() => {
@@ -89,10 +117,7 @@ export function useRemoteHost({
     }
   });
 
-  // If the host's own connection gets stuck (not connected/connecting) for
-  // more than ~5s, force a fresh client so state broadcasts resume for the
-  // phone. Transient blips usually recover within a second, so this only fires
-  // on genuine stalls.
+  // Reconnect stuck host connection
   const stuckSince = useRef<number | null>(null);
   useEffect(() => {
     if (status === "connected" || status === "connecting" || status === "not-configured") {
