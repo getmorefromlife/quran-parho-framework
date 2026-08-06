@@ -8,11 +8,6 @@ import {
   Play,
   Pause,
   MessageSquareQuote,
-  Timer,
-  Users,
-  Sun,
-  Moon,
-  Sparkles,
   Type,
   Layers,
   BookOpen,
@@ -25,6 +20,7 @@ import {
   Hourglass,
   RotateCcw,
   Check,
+  Settings2,
 } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -208,6 +204,7 @@ export function PresentationMode({
   const [viewMode, setViewMode] = useState<"turn_block" | "single_verse">("turn_block");
   const [layoutWidth, setLayoutWidth] = useState<"wide" | "centered">("wide");
   const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(true);
+  const [showMore, setShowMore] = useState(false);
 
   // Turn block calculation (5 verses)
   const blockStart = turnStartAyah || Math.floor((currentAyah - 1) / 5) * 5 + 1;
@@ -220,6 +217,35 @@ export function PresentationMode({
   const hasNext = isCircle
     ? turnNumber < totalTurns || surahN < 114
     : currentAyah < maxVerses || surahN < 114;
+
+  // Bottom bar Prev/Next labels (destination info for the current mode)
+  const prevLabel = isCircle
+    ? turnNumber > 1
+      ? `${lang === "ur" ? "ٹرن" : "Turn"} ${turnNumber - 1}`
+      : lang === "ur"
+        ? "شروع"
+        : "Start"
+    : viewMode === "turn_block"
+      ? blockStart > 1
+        ? `${lang === "ur" ? "آیات" : "Verses"} ${Math.max(blockStart - 5, 1)}–${blockStart - 1}`
+        : lang === "ur"
+          ? "شروع"
+          : "Start"
+      : `${lang === "ur" ? "آیت" : "Ayah"} ${Math.max(currentAyah - 1, 1)}`;
+
+  const nextLabel = isCircle
+    ? turnNumber < (totalTurns ?? 0)
+      ? `${lang === "ur" ? "ٹرن" : "Turn"} ${turnNumber + 1}`
+      : lang === "ur"
+        ? "اگلی سورت"
+        : "Next Surah"
+    : viewMode === "turn_block"
+      ? blockEnd < maxVerses
+        ? `${lang === "ur" ? "آیات" : "Verses"} ${blockEnd + 1}–${Math.min(blockEnd + 5, maxVerses)}`
+        : lang === "ur"
+          ? "اگلی سورت"
+          : "Next Surah"
+      : `${lang === "ur" ? "آیت" : "Ayah"} ${Math.min(currentAyah + 1, maxVerses)}`;
 
   const currentTheme = THEMES[themeStyle];
 
@@ -481,34 +507,31 @@ export function PresentationMode({
         )}
       >
         {/* Left: Surah Title & Mushaf Info */}
-        <div className="flex items-center gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-bold font-serif-display text-white">{surahEn}</span>
-              <span className={cn("text-xl font-arabic font-bold", currentTheme.gold)}>
-                {surahAr}
-              </span>
-            </div>
-            <div className="text-xs text-zinc-400 font-mono">
-              Surah {surahN} · Ayah {currentAyah} of {maxVerses}
-            </div>
+        <div className="flex items-center gap-3 min-w-0">
+          <span
+            className={cn(
+              "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm font-bold font-mono",
+              currentTheme.border,
+              currentTheme.badgeBg,
+              currentTheme.badgeText,
+            )}
+          >
+            {surahN}
+          </span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-lg sm:text-xl font-bold font-serif-display text-white truncate">
+              {surahEn}
+            </span>
+            <span
+              className={cn("text-lg sm:text-xl font-arabic font-bold shrink-0", currentTheme.gold)}
+            >
+              {surahAr}
+            </span>
           </div>
-
-          {/* Circle Turn Indicator Badge */}
-          {turnNumber && (
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-gold/15 border border-gold/40 text-gold text-xs font-bold shadow-gold">
-              <Users className="h-3.5 w-3.5" />
-              <span>
-                {lang === "ur"
-                  ? `ٹرن ${turnNumber} (آیات ${turnStartAyah}–${turnEndAyah})`
-                  : `Turn ${turnNumber} of ${totalTurns} (Ayahs ${turnStartAyah}–${turnEndAyah})`}
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Right: Projector Controls & Prominent Timers */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-nowrap min-w-0 overflow-x-auto">
           {/* Prominent Timers Bar */}
           <div className="flex items-center bg-zinc-900/90 border border-zinc-800 rounded-xl p-1 gap-1">
             {/* Session Timer (60m) */}
@@ -692,114 +715,6 @@ export function PresentationMode({
             )}
           </div>
 
-          {/* Theme Selector: Light | Parchment | Emerald | Midnight | OLED */}
-          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
-            <button
-              onClick={() => setThemeStyle("light")}
-              className={cn(
-                "w-6 h-6 rounded-lg bg-slate-100 border transition-all cursor-pointer",
-                themeStyle === "light"
-                  ? "border-amber-600 ring-1 ring-amber-600"
-                  : "border-slate-300",
-              )}
-              title="Light Clean Theme"
-            />
-            <button
-              onClick={() => setThemeStyle("parchment")}
-              className={cn(
-                "w-6 h-6 rounded-lg bg-[#f5efdf] border transition-all cursor-pointer",
-                themeStyle === "parchment"
-                  ? "border-amber-700 ring-1 ring-amber-700"
-                  : "border-[#dfd3b9]",
-              )}
-              title="Parchment Reading Theme"
-            />
-            <button
-              onClick={() => setThemeStyle("emerald")}
-              className={cn(
-                "w-6 h-6 rounded-lg bg-emerald-950 border transition-all cursor-pointer",
-                themeStyle === "emerald"
-                  ? "border-amber-400 ring-1 ring-amber-400"
-                  : "border-emerald-800",
-              )}
-              title="Emerald Theme"
-            />
-            <button
-              onClick={() => setThemeStyle("midnight")}
-              className={cn(
-                "w-6 h-6 rounded-lg bg-slate-900 border transition-all cursor-pointer",
-                themeStyle === "midnight" ? "border-gold ring-1 ring-gold" : "border-slate-700",
-              )}
-              title="Midnight Dark Theme"
-            />
-            <button
-              onClick={() => setThemeStyle("oled")}
-              className={cn(
-                "w-6 h-6 rounded-lg bg-black border transition-all cursor-pointer",
-                themeStyle === "oled"
-                  ? "border-yellow-400 ring-1 ring-yellow-400"
-                  : "border-zinc-700",
-              )}
-              title="High-Contrast OLED Theme"
-            />
-          </div>
-
-          {/* Arabic Font Size Scaler */}
-          {contentMode !== "translation_only" && (
-            <div
-              className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl px-2 py-1 gap-1"
-              title={lang === "ur" ? "عربی فونٹ سائز" : "Arabic Font Size"}
-            >
-              <Type className="h-3.5 w-3.5 text-amber-400" />
-              <span className="text-[10px] font-bold text-amber-300 uppercase">Ar</span>
-              <button
-                onClick={() => setArabicFontRem((s) => Math.max(2.0, s - 0.4))}
-                className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
-                title="Decrease Arabic Font Size"
-              >
-                A-
-              </button>
-              <span className="text-[10px] font-mono text-zinc-500">
-                {arabicFontRem.toFixed(1)}
-              </span>
-              <button
-                onClick={() => setArabicFontRem((s) => Math.min(6.0, s + 0.4))}
-                className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
-                title="Increase Arabic Font Size"
-              >
-                A+
-              </button>
-            </div>
-          )}
-
-          {/* Translation Font Size Scaler */}
-          {contentMode !== "arabic_only" && (
-            <div
-              className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl px-2 py-1 gap-1"
-              title={lang === "ur" ? "ترجمہ فونٹ سائز" : "Translation Font Size"}
-            >
-              <BookOpenText className="h-3.5 w-3.5 text-emerald-400" />
-              <span className="text-[10px] font-bold text-emerald-300 uppercase">Tr</span>
-              <button
-                onClick={() => setTransFontRem((s) => Math.max(0.6, s - 0.2))}
-                className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
-                title="Decrease Translation Font Size"
-              >
-                A-
-              </button>
-              <span className="text-[10px] font-mono text-zinc-500">
-                {transDisplayRem.toFixed(1)}
-              </span>
-              <button
-                onClick={() => setTransFontRem((s) => Math.min(4.0, s + 0.2))}
-                className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
-                title="Increase Translation Font Size"
-              >
-                A+
-              </button>
-            </div>
-          )}
-
           {/* View Mode Switcher: 5-Verse Turn Block vs Single Verse */}
           <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
             <button
@@ -830,46 +745,218 @@ export function PresentationMode({
             </button>
           </div>
 
-          {/* Screen Width Layout Switcher: Wide HD vs Centered */}
-          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
+          {/* More Controls Popover (Theme, Font Sizes, Layout, Fullscreen) */}
+          <div className="relative">
             <button
-              onClick={() => setLayoutWidth("wide")}
+              onClick={() => setShowMore((v) => !v)}
               className={cn(
-                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
-                layoutWidth === "wide"
-                  ? "bg-emerald-500 text-white shadow-sm"
-                  : "text-zinc-400 hover:text-white",
+                "h-9 w-9 rounded-xl flex items-center justify-center border transition-all cursor-pointer",
+                showMore
+                  ? "border-amber-500 bg-amber-500/15 text-amber-300"
+                  : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:text-white",
               )}
-              title="Wide HD Layout (Uses Full Screen Space for 5 Verses)"
+              title={lang === "en" ? "More Controls" : "مزید کنٹرولز"}
             >
-              <Columns className="h-3.5 w-3.5" />
-              <span className="hidden lg:inline">Wide HD</span>
+              <Settings2 className="h-4 w-4" />
             </button>
-            <button
-              onClick={() => setLayoutWidth("centered")}
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
-                layoutWidth === "centered"
-                  ? "bg-emerald-500 text-white shadow-sm"
-                  : "text-zinc-400 hover:text-white",
-              )}
-              title="Centered Focus Layout"
-            >
-              <Monitor className="h-3.5 w-3.5" />
-              <span className="hidden lg:inline">Centered</span>
-            </button>
-          </div>
 
-          {/* Fullscreen Toggle */}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={toggleFullscreen}
-            className="h-9 w-9 rounded-xl border-zinc-800 bg-zinc-900 text-zinc-300 hover:text-white cursor-pointer"
-            title={lang === "en" ? "Toggle Fullscreen (F)" : "فل اسکرین"}
-          >
-            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          </Button>
+            {showMore && (
+              <div className="absolute right-0 top-full mt-2 z-50 w-[min(90vw,20rem)] rounded-2xl border border-zinc-700 bg-zinc-900/95 backdrop-blur-xl shadow-2xl">
+                <div className="flex items-center justify-between px-4 pt-3 pb-1 border-b border-zinc-800">
+                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                    {lang === "en" ? "Presentation Controls" : "پریزنٹیشن کنٹرولز"}
+                  </span>
+                  <button
+                    onClick={() => setShowMore(false)}
+                    className="flex items-center justify-center h-6 w-6 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
+                    title={lang === "en" ? "Close" : "بند کریں"}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <div className="p-4 space-y-5">
+                  {/* Theme Selector */}
+                  <div className="space-y-2">
+                    <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                      {lang === "en" ? "Theme" : "تھیم"}
+                    </div>
+                    <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 gap-1 w-fit">
+                      <button
+                        onClick={() => setThemeStyle("light")}
+                        className={cn(
+                          "w-6 h-6 rounded-lg bg-slate-100 border transition-all cursor-pointer",
+                          themeStyle === "light"
+                            ? "border-amber-600 ring-1 ring-amber-600"
+                            : "border-slate-300",
+                        )}
+                        title="Light Clean Theme"
+                      />
+                      <button
+                        onClick={() => setThemeStyle("parchment")}
+                        className={cn(
+                          "w-6 h-6 rounded-lg bg-[#f5efdf] border transition-all cursor-pointer",
+                          themeStyle === "parchment"
+                            ? "border-amber-700 ring-1 ring-amber-700"
+                            : "border-[#dfd3b9]",
+                        )}
+                        title="Parchment Reading Theme"
+                      />
+                      <button
+                        onClick={() => setThemeStyle("emerald")}
+                        className={cn(
+                          "w-6 h-6 rounded-lg bg-emerald-950 border transition-all cursor-pointer",
+                          themeStyle === "emerald"
+                            ? "border-amber-400 ring-1 ring-amber-400"
+                            : "border-emerald-800",
+                        )}
+                        title="Emerald Theme"
+                      />
+                      <button
+                        onClick={() => setThemeStyle("midnight")}
+                        className={cn(
+                          "w-6 h-6 rounded-lg bg-slate-900 border transition-all cursor-pointer",
+                          themeStyle === "midnight"
+                            ? "border-gold ring-1 ring-gold"
+                            : "border-slate-700",
+                        )}
+                        title="Midnight Dark Theme"
+                      />
+                      <button
+                        onClick={() => setThemeStyle("oled")}
+                        className={cn(
+                          "w-6 h-6 rounded-lg bg-black border transition-all cursor-pointer",
+                          themeStyle === "oled"
+                            ? "border-yellow-400 ring-1 ring-yellow-400"
+                            : "border-zinc-700",
+                        )}
+                        title="High-Contrast OLED Theme"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Arabic Font Size Scaler */}
+                  {contentMode !== "translation_only" && (
+                    <div className="space-y-2">
+                      <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                        {lang === "en" ? "Arabic Font Size" : "عربی فونٹ سائز"}
+                      </div>
+                      <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl px-2 py-1 gap-1 w-fit">
+                        <Type className="h-3.5 w-3.5 text-amber-400" />
+                        <span className="text-[10px] font-bold text-amber-300 uppercase">Ar</span>
+                        <button
+                          onClick={() => setArabicFontRem((s) => Math.max(2.0, s - 0.4))}
+                          className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
+                          title="Decrease Arabic Font Size"
+                        >
+                          A-
+                        </button>
+                        <span className="text-[10px] font-mono text-zinc-500">
+                          {arabicFontRem.toFixed(1)}
+                        </span>
+                        <button
+                          onClick={() => setArabicFontRem((s) => Math.min(6.0, s + 0.4))}
+                          className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
+                          title="Increase Arabic Font Size"
+                        >
+                          A+
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Translation Font Size Scaler */}
+                  {contentMode !== "arabic_only" && (
+                    <div className="space-y-2">
+                      <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                        {lang === "en" ? "Translation Font Size" : "ترجمہ فونٹ سائز"}
+                      </div>
+                      <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl px-2 py-1 gap-1 w-fit">
+                        <BookOpenText className="h-3.5 w-3.5 text-emerald-400" />
+                        <span className="text-[10px] font-bold text-emerald-300 uppercase">Tr</span>
+                        <button
+                          onClick={() => setTransFontRem((s) => Math.max(0.6, s - 0.2))}
+                          className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
+                          title="Decrease Translation Font Size"
+                        >
+                          A-
+                        </button>
+                        <span className="text-[10px] font-mono text-zinc-500">
+                          {transDisplayRem.toFixed(1)}
+                        </span>
+                        <button
+                          onClick={() => setTransFontRem((s) => Math.min(4.0, s + 0.2))}
+                          className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
+                          title="Increase Translation Font Size"
+                        >
+                          A+
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Layout Width Switcher */}
+                  <div className="space-y-2">
+                    <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                      {lang === "en" ? "Layout Width" : "لی آؤٹ چوڑائی"}
+                    </div>
+                    <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 gap-1 w-fit">
+                      <button
+                        onClick={() => setLayoutWidth("wide")}
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                          layoutWidth === "wide"
+                            ? "bg-emerald-500 text-white shadow-sm"
+                            : "text-zinc-400 hover:text-white",
+                        )}
+                        title="Wide HD Layout (Uses Full Screen Space for 5 Verses)"
+                      >
+                        <Columns className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Wide HD</span>
+                      </button>
+                      <button
+                        onClick={() => setLayoutWidth("centered")}
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                          layoutWidth === "centered"
+                            ? "bg-emerald-500 text-white shadow-sm"
+                            : "text-zinc-400 hover:text-white",
+                        )}
+                        title="Centered Focus Layout"
+                      >
+                        <Monitor className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Centered</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Fullscreen Toggle */}
+                  <div className="pt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={toggleFullscreen}
+                      className="w-full rounded-xl border-zinc-700 bg-zinc-950 text-zinc-300 hover:text-white cursor-pointer gap-2"
+                    >
+                      {isFullscreen ? (
+                        <Minimize2 className="h-4 w-4" />
+                      ) : (
+                        <Maximize2 className="h-4 w-4" />
+                      )}
+                      <span>
+                        {isFullscreen
+                          ? lang === "en"
+                            ? "Exit Fullscreen"
+                            : "فل اسکرین بند کریں"
+                          : lang === "en"
+                            ? "Enter Fullscreen"
+                            : "فل اسکرین کریں"}
+                      </span>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Close Projector Mode */}
           <Button
@@ -1183,14 +1270,31 @@ export function PresentationMode({
           variant="outline"
           disabled={!hasPrev}
           onClick={handlePrev}
-          className="h-12 px-6 rounded-2xl border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 text-base font-semibold gap-2 cursor-pointer disabled:opacity-40"
+          className="h-12 px-5 rounded-2xl border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 text-sm font-semibold gap-2 cursor-pointer disabled:opacity-40"
+          title={lang === "en" ? "Previous" : "پچھلا"}
         >
           <ChevronLeft className="h-5 w-5 text-amber-400" />
-          <span>{lang === "en" ? "Previous Verse (←)" : "پچھلی آیت"}</span>
+          <span className="whitespace-nowrap">{prevLabel}</span>
         </Button>
 
         {/* Center Action Controls */}
         <div className="flex items-center gap-3">
+          <span
+            className={cn(
+              "hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-mono font-bold shadow-sm",
+              currentTheme.border,
+              currentTheme.badgeBg,
+              currentTheme.badgeText,
+            )}
+          >
+            Surah {surahN} · Ayah {currentAyah}/{maxVerses}
+            {isCircle && (
+              <>
+                {" "}
+                · Turn {turnNumber}/{totalTurns}
+              </>
+            )}
+          </span>
           <Button
             variant="outline"
             onClick={() => setShowPrompts((v) => !v)}
@@ -1210,9 +1314,10 @@ export function PresentationMode({
         <Button
           disabled={!hasNext}
           onClick={handleNext}
-          className="h-12 px-6 rounded-2xl bg-emerald-gradient hover:opacity-95 text-white text-base font-bold gap-2 shadow-gold cursor-pointer disabled:opacity-40"
+          className="h-12 px-5 rounded-2xl bg-emerald-gradient hover:opacity-95 text-white text-sm font-bold gap-2 shadow-gold cursor-pointer disabled:opacity-40"
+          title={lang === "en" ? "Next" : "اگلا"}
         >
-          <span>{lang === "en" ? "Next Verse (→)" : "اگلی آیت"}</span>
+          <span className="whitespace-nowrap">{nextLabel}</span>
           <ChevronRight className="h-5 w-5 text-amber-300" />
         </Button>
       </div>
