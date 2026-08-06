@@ -25,6 +25,7 @@ import {
   VolumeX,
   Presentation,
   BookOpenCheck,
+  Smartphone,
 } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,15 @@ import {
 import { playAlertBeep } from "@/lib/timer-beep";
 import { NumInput } from "@/components/num-input";
 import { BigTimerCard } from "@/components/shared/big-timer-card";
+import { RemotePanel } from "@/components/shared/remote-panel";
+import {
+  generateRoomCode,
+  isRemoteConfigured,
+  openRemoteRoom,
+  type RemoteCommand,
+  type RemoteRoom,
+  type RoomMember,
+} from "@/lib/remote-control";
 import {
   loadTimerDurations,
   saveTimerDurations,
@@ -271,6 +281,85 @@ export function PresentationMode({
   useEffect(() => {
     saveTimerDurations(durations);
   }, [durations]);
+
+  // Phone remote control (Ably relay): host connection for the Remote panel
+  const [remotePanelOpen, setRemotePanelOpen] = useState(false);
+  const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [remoteRoom, setRemoteRoom] = useState<RemoteRoom | null>(null);
+  const [remoteStatus, setRemoteStatus] = useState("connecting");
+  const [remoteMembers, setRemoteMembers] = useState<RoomMember[]>([]);
+
+  const buildStateSnapshot = () => ({
+    type: "state" as const,
+    session: { secs: sessionTimer, active: sessionActive, total: sessionTotal },
+    qa: { secs: qaTimer, active: qaActive, total: qaTotal },
+    turn: { secs: timerSeconds, active: timerActive, total: turnTotal },
+    soundEnabled,
+  });
+
+  const remoteCommandRef = useRef<((cmd: RemoteCommand) => void) | null>(null);
+
+  // Open the relay room as host while the Remote panel is shown
+  useEffect(() => {
+    if (!remotePanelOpen) return;
+    if (!isRemoteConfigured()) {
+      setRemoteStatus("not-configured");
+      return;
+    }
+    let cancelled = false;
+    let room: RemoteRoom | null = null;
+    const code = generateRoomCode();
+    setRoomCode(code);
+    openRemoteRoom(code, "host", {
+      onCommand: (cmd) => remoteCommandRef.current?.(cmd),
+      onMembers: (members) => setRemoteMembers(members),
+      onConnectionState: (state) => setRemoteStatus(state),
+    }).then((opened) => {
+      if (cancelled) {
+        opened?.close();
+        return;
+      }
+      room = opened;
+      setRemoteRoom(opened);
+      if (!opened) setRemoteStatus("not-configured");
+    });
+    return () => {
+      cancelled = true;
+      room?.close();
+      setRemoteRoom(null);
+      setRemoteMembers([]);
+    };
+  }, [remotePanelOpen]);
+
+  // Broadcast a fresh state snapshot immediately and every 2s while connected
+  useEffect(() => {
+    if (!remoteRoom) return;
+    const publishNow = () => remoteRoom.publish(buildStateSnapshot());
+    publishNow();
+    const id = window.setInterval(publishNow, 2000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remoteRoom]);
+
+  // Push an immediate snapshot whenever timer state changes (e.g. a remote joins)
+  useEffect(() => {
+    if (!remoteRoom) return;
+    remoteRoom.publish(buildStateSnapshot());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    remoteRoom,
+    sessionTimer,
+    qaTimer,
+    timerSeconds,
+    sessionActive,
+    qaActive,
+    timerActive,
+    soundEnabled,
+    sessionTotal,
+    qaTotal,
+    turnTotal,
+    remoteMembers,
+  ]);
 
   // Timers-only fullscreen projection (hide the Quran, show only the big timers)
   const [timersOnly, setTimersOnly] = useState(false);
@@ -653,6 +742,37 @@ export function PresentationMode({
     if (key === "qa" && !qaActive) setQaTimer(toSeconds(min));
     if (key === "turn" && !timerActive) setTimerSeconds(toSeconds(min));
   };
+
+  // Dispatch commands received from a phone remote to the live timer handlers
+  const handleRemoteCommand = (cmd: RemoteCommand) => {
+    switch (cmd.action) {
+      case "toggleSession":
+        toggleSession();
+        break;
+      case "resetSession":
+        resetSession();
+        break;
+      case "toggleQa":
+        toggleQa();
+        break;
+      case "resetQa":
+        resetQa();
+        break;
+      case "toggleTurn":
+        toggleTurn();
+        break;
+      case "resetTurn":
+        resetTurn();
+        break;
+      case "toggleSound":
+        setSoundEnabled((v) => !v);
+        break;
+      case "setDuration":
+        setDurationSetting(cmd.key, cmd.minutes);
+        break;
+    }
+  };
+  remoteCommandRef.current = handleRemoteCommand;
 
   const renderDurationRow = (
     label: string,
@@ -1506,6 +1626,24 @@ export function PresentationMode({
                 {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
                 <span className="hidden md:inline">{lang === "en" ? "Beep" : "آواز"}</span>
               </button>
+
+              {/* Phone Remote Control */}
+              <button
+                onClick={() => setRemotePanelOpen((v) => !v)}
+                className={cn(
+                  "flex shrink-0 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-xs font-bold transition-all cursor-pointer",
+                  currentTheme.border,
+                  remotePanelOpen
+                    ? "text-emerald-400 hover:text-emerald-300"
+                    : "text-zinc-400 hover:text-white",
+                )}
+                title={
+                  lang === "en" ? "Control timers from your phone" : "فون سے ٹائمرز کو کنٹرول کریں"
+                }
+              >
+                <Smartphone className="h-4 w-4" />
+                <span className="hidden md:inline">{lang === "en" ? "Remote" : "ریموٹ"}</span>
+              </button>
             </div>
           </div>
 
@@ -1882,6 +2020,17 @@ export function PresentationMode({
             </Button>
           </div>
         </>
+      )}
+
+      {/* Phone Remote pairing panel */}
+      {remotePanelOpen && roomCode && (
+        <RemotePanel
+          lang={lang}
+          room={roomCode}
+          status={remoteStatus}
+          members={remoteMembers}
+          onClose={() => setRemotePanelOpen(false)}
+        />
       )}
     </div>
   );

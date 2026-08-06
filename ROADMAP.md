@@ -25,6 +25,38 @@
 
 ## Recently Completed
 
+### Phone Remote Control for Circle Timers (2026-08-06)
+
+Facilitators can now operate the presentation-mode timers (Session / Q&A / Turn) from a
+phone, so they never have to walk up to the projector.
+
+- **Realtime relay:** Ably free tier (client-only SDK, no backend). Channel per room
+  (`qp:{ROOMCODE}`), presence roles (`host` / `remote`), message history/rewind available.
+  Env var `VITE_ABLY_KEY` (set in Vercel; local copy in git-ignored `.env.local`).
+  > **Deliberate ROADMAP exception:** the "no external API dependencies" rule is waived for
+  > this single feature — cross-device control inherently requires a realtime relay. The
+  > key is restricted to `qp-*` channels (publish/subscribe/presence/history only), and
+  > pairing is gated by a random 6-char room code.
+- **`src/lib/remote-control.ts`** — typed relay wrapper: `generateRoomCode()`,
+  `normalizeRoom()`, `remoteUrlForRoom()`, `openRemoteRoom(room, role, events)` with
+  `RemoteCommand` / `RemoteState` / `RoomMember` types. Ably is dynamically imported so it
+  never enters the server bundle.
+- **Host — `presentation-mode.tsx`:** new **Remote** button (Smartphone icon) in the Timer
+  Dock opens a pairing panel (`remote-panel.tsx`) with a **room code + QR code** and
+  connected-phone count. The host broadcasts a state snapshot every 2s and on every change,
+  and dispatches incoming `cmd` messages to the existing live handlers
+  (`toggleSession`, `resetQa`, `setDurationSetting`, mute, etc.). The projector stays the
+  single source of truth for countdowns.
+- **Phone — new route `src/routes/remote.tsx`** (`/remote?room=CODE`): mobile-first control
+  page with big touch targets — Start/Pause + Reset + duration presets for each of the three
+  timers, live mirrored countdowns, beep-mute toggle, "host connected" indicator, and a
+  room-code landing page with recent rooms. QR scan (or typed code) pairs instantly.
+- **Pairing UX:** the QR encodes `location.origin/remote?room=CODE`; scanning with a phone
+  camera opens the control page pre-connected.
+- **Graceful degradation:** without `VITE_ABLY_KEY`, the Remote panel and phone page show a
+  "not configured" notice instead of crashing.
+- Added deps: `ably`, `react-qr-code`.
+
 ### Fullscreen Timers + Custom Timer Durations (2026-08-06)
 
 Users can now present **just the timers** on a big fullscreen screen and set their own
