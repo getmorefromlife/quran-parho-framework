@@ -44,14 +44,8 @@ import { playAlertBeep } from "@/lib/timer-beep";
 import { NumInput } from "@/components/num-input";
 import { BigTimerCard } from "@/components/shared/big-timer-card";
 import { RemotePanel } from "@/components/shared/remote-panel";
-import {
-  generateRoomCode,
-  isRemoteConfigured,
-  openRemoteRoom,
-  type RemoteCommand,
-  type RemoteRoom,
-  type RoomMember,
-} from "@/lib/remote-control";
+import { useRemoteHost } from "@/hooks/use-remote-host";
+import type { RemoteCommand } from "@/lib/remote-control";
 import {
   loadTimerDurations,
   saveTimerDurations,
@@ -283,83 +277,14 @@ export function PresentationMode({
   }, [durations]);
 
   // Phone remote control (Ably relay): host connection for the Remote panel
-  const [remotePanelOpen, setRemotePanelOpen] = useState(false);
-  const [roomCode, setRoomCode] = useState<string | null>(null);
-  const [remoteRoom, setRemoteRoom] = useState<RemoteRoom | null>(null);
-  const [remoteStatus, setRemoteStatus] = useState("connecting");
-  const [remoteMembers, setRemoteMembers] = useState<RoomMember[]>([]);
-
   const buildStateSnapshot = () => ({
     type: "state" as const,
     session: { secs: sessionTimer, active: sessionActive, total: sessionTotal },
     qa: { secs: qaTimer, active: qaActive, total: qaTotal },
     turn: { secs: timerSeconds, active: timerActive, total: turnTotal },
     soundEnabled,
+    supportsTurn: true,
   });
-
-  const remoteCommandRef = useRef<((cmd: RemoteCommand) => void) | null>(null);
-
-  // Open the relay room as host while the Remote panel is shown
-  useEffect(() => {
-    if (!remotePanelOpen) return;
-    if (!isRemoteConfigured()) {
-      setRemoteStatus("not-configured");
-      return;
-    }
-    let cancelled = false;
-    let room: RemoteRoom | null = null;
-    const code = generateRoomCode();
-    setRoomCode(code);
-    openRemoteRoom(code, "host", {
-      onCommand: (cmd) => remoteCommandRef.current?.(cmd),
-      onMembers: (members) => setRemoteMembers(members),
-      onConnectionState: (state) => setRemoteStatus(state),
-    }).then((opened) => {
-      if (cancelled) {
-        opened?.close();
-        return;
-      }
-      room = opened;
-      setRemoteRoom(opened);
-      if (!opened) setRemoteStatus("not-configured");
-    });
-    return () => {
-      cancelled = true;
-      room?.close();
-      setRemoteRoom(null);
-      setRemoteMembers([]);
-    };
-  }, [remotePanelOpen]);
-
-  // Broadcast a fresh state snapshot immediately and every 2s while connected
-  useEffect(() => {
-    if (!remoteRoom) return;
-    const publishNow = () => remoteRoom.publish(buildStateSnapshot());
-    publishNow();
-    const id = window.setInterval(publishNow, 2000);
-    return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remoteRoom]);
-
-  // Push an immediate snapshot whenever timer state changes (e.g. a remote joins)
-  useEffect(() => {
-    if (!remoteRoom) return;
-    remoteRoom.publish(buildStateSnapshot());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    remoteRoom,
-    sessionTimer,
-    qaTimer,
-    timerSeconds,
-    sessionActive,
-    qaActive,
-    timerActive,
-    soundEnabled,
-    sessionTotal,
-    qaTotal,
-    turnTotal,
-    remoteMembers,
-  ]);
 
   // Timers-only fullscreen projection (hide the Quran, show only the big timers)
   const [timersOnly, setTimersOnly] = useState(false);
@@ -772,7 +697,9 @@ export function PresentationMode({
         break;
     }
   };
-  remoteCommandRef.current = handleRemoteCommand;
+
+  // Shared phone-remote host relay (pairing panel + command dispatch)
+  const remote = useRemoteHost({ getSnapshot: buildStateSnapshot, onCommand: handleRemoteCommand });
 
   const renderDurationRow = (
     label: string,
@@ -1629,11 +1556,11 @@ export function PresentationMode({
 
               {/* Phone Remote Control */}
               <button
-                onClick={() => setRemotePanelOpen((v) => !v)}
+                onClick={() => remote.setPanelOpen((v) => !v)}
                 className={cn(
                   "flex shrink-0 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-xs font-bold transition-all cursor-pointer",
                   currentTheme.border,
-                  remotePanelOpen
+                  remote.panelOpen
                     ? "text-emerald-400 hover:text-emerald-300"
                     : "text-zinc-400 hover:text-white",
                 )}
@@ -2023,13 +1950,13 @@ export function PresentationMode({
       )}
 
       {/* Phone Remote pairing panel */}
-      {remotePanelOpen && roomCode && (
+      {remote.panelOpen && remote.roomCode && (
         <RemotePanel
           lang={lang}
-          room={roomCode}
-          status={remoteStatus}
-          members={remoteMembers}
-          onClose={() => setRemotePanelOpen(false)}
+          room={remote.roomCode}
+          status={remote.status}
+          members={remote.members}
+          onClose={() => remote.setPanelOpen(false)}
         />
       )}
     </div>

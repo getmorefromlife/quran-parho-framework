@@ -429,16 +429,18 @@ function RemotePage() {
           lang={lang}
           onCommand={send}
         />
-        <TimerControl
-          label={isEn ? "Turn" : "ٹرن"}
-          icon={Hourglass}
-          slice={state?.turn}
-          presets={TURN_PRESETS}
-          durationKey="turn"
-          accent="emerald"
-          lang={lang}
-          onCommand={send}
-        />
+        {state?.supportsTurn !== false && (
+          <TimerControl
+            label={isEn ? "Turn" : "ٹرن"}
+            icon={Hourglass}
+            slice={state?.turn}
+            presets={TURN_PRESETS}
+            durationKey="turn"
+            accent="emerald"
+            lang={lang}
+            onCommand={send}
+          />
+        )}
 
         <button
           onClick={() => send({ type: "cmd", action: "toggleSound" })}

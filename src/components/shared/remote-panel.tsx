@@ -81,13 +81,9 @@ export function RemotePanel({
         </div>
 
         <div className="mt-5 flex justify-center">
-          <QRCode
-            value={url}
-            size={180}
-            bgColor="transparent"
-            fgColor="#fafafa"
-            style={{ padding: 12, background: "#fff", borderRadius: 16 }}
-          />
+          <div className="rounded-2xl bg-white p-4 shadow-xl ring-1 ring-zinc-300">
+            <QRCode value={url} size={200} bgColor="#ffffff" fgColor="#0a0a0a" />
+          </div>
         </div>
 
         <div className="mt-5 space-y-1">

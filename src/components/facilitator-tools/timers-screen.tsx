@@ -5,12 +5,16 @@ import {
   MessageSquare,
   Minimize2,
   Presentation,
+  Smartphone,
   Volume2,
   VolumeX,
   X,
 } from "lucide-react";
 import { BigTimerCard } from "@/components/shared/big-timer-card";
+import { RemotePanel } from "@/components/shared/remote-panel";
 import { useCountdownTimer } from "@/hooks/use-countdown-timer";
+import { useRemoteHost } from "@/hooks/use-remote-host";
+import type { RemoteCommand } from "@/lib/remote-control";
 import {
   loadTimerDurations,
   saveTimerDurations,
@@ -40,6 +44,46 @@ export function TimersScreen({ lang, onClose }: { lang: string; onClose: () => v
     if (key === "session") session.setDuration(toSeconds(min));
     if (key === "qa") qa.setDuration(toSeconds(min));
   };
+
+  // Phone remote control: host relay + pairing panel (Session + Q&A only)
+  const buildStateSnapshot = () => ({
+    type: "state" as const,
+    session: { secs: session.seconds, active: session.active, total: session.total },
+    qa: { secs: qa.seconds, active: qa.active, total: qa.total },
+    turn: { secs: 0, active: false, total: 0 },
+    soundEnabled,
+    supportsTurn: false,
+  });
+
+  const handleRemoteCommand = (cmd: RemoteCommand) => {
+    switch (cmd.action) {
+      case "toggleSession":
+        session.toggle();
+        break;
+      case "resetSession":
+        session.reset();
+        break;
+      case "toggleQa":
+        qa.toggle();
+        break;
+      case "resetQa":
+        qa.reset();
+        break;
+      case "toggleSound":
+        setSoundEnabled((v) => !v);
+        break;
+      case "setDuration":
+        if (cmd.key === "session" || cmd.key === "qa") {
+          setDurationSetting(cmd.key, cmd.minutes);
+        }
+        break;
+      case "toggleTurn":
+      case "resetTurn":
+        break;
+    }
+  };
+
+  const remote = useRemoteHost({ getSnapshot: buildStateSnapshot, onCommand: handleRemoteCommand });
 
   // Expiry + one-minute warning beeps (ref-guarded against repeat fires)
   useEffect(() => {
@@ -115,6 +159,20 @@ export function TimersScreen({ lang, onClose }: { lang: string; onClose: () => v
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
+            onClick={() => remote.setPanelOpen((v) => !v)}
+            className={cn(
+              "flex h-10 w-10 items-center justify-center rounded-xl border transition-all cursor-pointer",
+              remote.panelOpen
+                ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-400"
+                : "border-zinc-700 text-zinc-400 hover:text-white hover:bg-zinc-800",
+            )}
+            title={
+              lang === "en" ? "Control timers from your phone" : "فون سے ٹائمرز کو کنٹرول کریں"
+            }
+          >
+            <Smartphone className="h-4 w-4" />
+          </button>
+          <button
             onClick={() => setSoundEnabled((v) => !v)}
             className={cn(
               "flex h-10 w-10 items-center justify-center rounded-xl border transition-all cursor-pointer",
@@ -189,6 +247,16 @@ export function TimersScreen({ lang, onClose }: { lang: string; onClose: () => v
           ? "Durations are saved on this device and shared with Quran presentation mode."
           : "مدت اس ڈیوائس پر محفوظ ہوتی ہے اور قرآن پریزنٹیشن موڈ کے ساتھ مشترک ہے۔"}
       </div>
+
+      {remote.panelOpen && remote.roomCode && (
+        <RemotePanel
+          lang={lang}
+          room={remote.roomCode}
+          status={remote.status}
+          members={remote.members}
+          onClose={() => remote.setPanelOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -20,6 +20,7 @@ export type RemoteState = {
   qa: TimerSlice;
   turn: TimerSlice;
   soundEnabled: boolean;
+  supportsTurn?: boolean;
 };
 
 export type RemoteMessage = RemoteCommand | RemoteState;
