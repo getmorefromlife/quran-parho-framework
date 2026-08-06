@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -21,6 +21,8 @@ import {
   RotateCcw,
   Check,
   Settings2,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
@@ -184,6 +186,30 @@ function clearFavoriteSizes() {
   localStorage.removeItem(FAV_TR_KEY);
 }
 
+function playAlertBeep() {
+  if (typeof window === "undefined") return;
+  const Ctx =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!Ctx) return;
+  const ctx = new Ctx();
+  const tone = (startAt: number, freq: number) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime + startAt);
+    gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + startAt + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + startAt + 0.18);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(ctx.currentTime + startAt);
+    osc.stop(ctx.currentTime + startAt + 0.2);
+  };
+  tone(0, 880);
+  tone(0.25, 660);
+  window.setTimeout(() => ctx.close().catch(() => {}), 1200);
+}
+
 export function PresentationMode({
   surahN,
   verses,
@@ -243,6 +269,40 @@ export function PresentationMode({
 
   const [timerSeconds, setTimerSeconds] = useState(300); // 5-min turn timer
   const [timerActive, setTimerActive] = useState(false);
+
+  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  // Beep once when a timer hits 0 while running (ref-guarded against repeat fires)
+  const sessionBeepRef = useRef(false);
+  const qaBeepRef = useRef(false);
+  const turnBeepRef = useRef(false);
+
+  useEffect(() => {
+    if (sessionTimer === 0 && sessionActive) {
+      if (!sessionBeepRef.current && soundEnabled) playAlertBeep();
+      sessionBeepRef.current = true;
+    } else if (sessionTimer > 0) {
+      sessionBeepRef.current = false;
+    }
+  }, [sessionTimer, sessionActive, soundEnabled]);
+
+  useEffect(() => {
+    if (qaTimer === 0 && qaActive) {
+      if (!qaBeepRef.current && soundEnabled) playAlertBeep();
+      qaBeepRef.current = true;
+    } else if (qaTimer > 0) {
+      qaBeepRef.current = false;
+    }
+  }, [qaTimer, qaActive, soundEnabled]);
+
+  useEffect(() => {
+    if (timerSeconds === 0 && timerActive) {
+      if (!turnBeepRef.current && soundEnabled) playAlertBeep();
+      turnBeepRef.current = true;
+    } else if (timerSeconds > 0) {
+      turnBeepRef.current = false;
+    }
+  }, [timerSeconds, timerActive, soundEnabled]);
 
   const [viewMode, setViewMode] = useState<ViewMode>("turn_block");
   const [layoutWidth, setLayoutWidth] = useState<"wide" | "centered">("wide");
@@ -490,6 +550,12 @@ export function PresentationMode({
         toggleFullscreen();
       } else if (e.key === "Escape") {
         onClose();
+      } else if (e.key === "s" || e.key === "S") {
+        setSessionActive((v) => !v);
+      } else if (e.key === "q" || e.key === "Q") {
+        setQaActive((v) => !v);
+      } else if (e.key === "t" || e.key === "T") {
+        setTimerActive((v) => !v);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -527,6 +593,82 @@ export function PresentationMode({
     return `${m}:${s < 10 ? "0" : ""}${s}`;
   };
 
+  // Renders one prominent timer card for the Timer Dock
+  const renderTimerCard = (
+    label: string,
+    icon: typeof Clock,
+    seconds: number,
+    total: number,
+    active: boolean,
+    onToggle: () => void,
+    onReset: () => void,
+    chipStyle: string,
+    fillStyle: string,
+    hint: string,
+  ) => {
+    const pct = Math.max(0, Math.min(1, seconds / total));
+    const urgent = active && seconds > 0 && seconds <= 60;
+    const expired = seconds === 0;
+    const Icon = icon;
+    return (
+      <div
+        className={cn(
+          "flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 transition-all",
+          currentTheme.cardBg,
+          currentTheme.border,
+          expired && "border-red-500/70",
+        )}
+      >
+        <button
+          onClick={onToggle}
+          className="flex items-center gap-3 min-w-0 cursor-pointer group"
+          title={hint}
+        >
+          <span
+            className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-lg border", chipStyle)}
+          >
+            <Icon className="h-4 w-4" />
+          </span>
+          <span className="text-left min-w-0">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+              {label}
+            </span>
+            <span
+              className={cn(
+                "block font-mono tabular-nums font-bold text-lg sm:text-xl leading-tight transition-colors",
+                expired
+                  ? "text-red-500"
+                  : urgent
+                    ? "text-red-400 animate-pulse"
+                    : active
+                      ? currentTheme.gold
+                      : currentTheme.text,
+              )}
+            >
+              {formatTimer(seconds)}
+            </span>
+            <span className="block h-1.5 w-full min-w-[5.5rem] rounded-full bg-zinc-800/50 mt-1">
+              <span
+                className={cn(
+                  "block h-full rounded-full transition-all duration-1000",
+                  expired ? "bg-red-500" : fillStyle,
+                )}
+                style={{ width: `${pct * 100}%` }}
+              />
+            </span>
+          </span>
+        </button>
+        <button
+          onClick={onReset}
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
+          title={lang === "en" ? "Reset Timer" : "ٹائمر دوبارہ ترتیب دیں"}
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div
       className={cn(
@@ -538,557 +680,612 @@ export function PresentationMode({
       {/* ── Top Bar ── */}
       <div
         className={cn(
-          "sticky top-0 z-10 px-6 py-4 flex items-center justify-between border-b backdrop-blur-xl",
+          "sticky top-0 z-10 flex flex-col border-b backdrop-blur-xl",
           currentTheme.border,
         )}
       >
-        {/* Left: Surah Title & Mushaf Info */}
-        <div className="flex items-center gap-3 min-w-0">
-          <span
-            className={cn(
-              "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm font-bold font-mono",
-              currentTheme.border,
-              currentTheme.badgeBg,
-              currentTheme.badgeText,
-            )}
-          >
-            {surahN}
-          </span>
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-lg sm:text-xl font-bold font-serif-display text-white truncate">
-              {surahEn}
-            </span>
+        {/* Row 1: Single-line Projector Bar */}
+        <div className="flex items-center justify-between px-6 py-4">
+          {/* Left: Surah Title & Mushaf Info */}
+          <div className="flex items-center gap-3 min-w-0">
             <span
-              className={cn("text-lg sm:text-xl font-arabic font-bold shrink-0", currentTheme.gold)}
+              className={cn(
+                "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm font-bold font-mono",
+                currentTheme.border,
+                currentTheme.badgeBg,
+                currentTheme.badgeText,
+              )}
             >
-              {surahAr}
+              {surahN}
             </span>
-          </div>
-        </div>
-
-        {/* Right: Projector Controls & Prominent Timers */}
-        <div className="flex items-center gap-1.5 flex-nowrap min-w-0">
-          {/* Scrollable core controls (no popovers here to avoid clipping) */}
-          <div className="flex items-center gap-1.5 flex-nowrap flex-1 min-w-0 overflow-x-auto">
-            {/* Prominent Timers Bar */}
-            <div className="flex items-center bg-zinc-900/90 border border-zinc-800 rounded-xl p-1 gap-1">
-              {/* Session Timer (60m) */}
-              <button
-                onClick={() => {
-                  setSessionActive((v) => !v);
-                  if (!sessionActive && sessionTimer === 0) setSessionTimer(3600);
-                }}
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-lg sm:text-xl font-bold font-serif-display text-white truncate">
+                {surahEn}
+              </span>
+              <span
                 className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer",
-                  sessionActive
-                    ? "bg-amber-500 text-black shadow-sm"
-                    : "text-zinc-300 hover:text-white",
+                  "text-lg sm:text-xl font-arabic font-bold shrink-0",
+                  currentTheme.gold,
                 )}
-                title="1-Hour Session Timer (Click to Play/Pause)"
               >
-                <Clock className="h-3.5 w-3.5" />
-                <span>{formatTimer(sessionTimer)}</span>
-              </button>
-
-              {/* Q&A Timer (15m) */}
-              <button
-                onClick={() => {
-                  setQaActive((v) => !v);
-                  if (!qaActive && qaTimer === 0) setQaTimer(900);
-                }}
-                className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer",
-                  qaActive ? "bg-blue-500 text-white shadow-sm" : "text-zinc-300 hover:text-white",
-                )}
-                title="Circle Q&A Timer (Click to Play/Pause)"
-              >
-                <MessageSquare className="h-3.5 w-3.5" />
-                <span>Q&A: {formatTimer(qaTimer)}</span>
-              </button>
-
-              {/* Turn Pace Timer (5m) */}
-              <button
-                onClick={() => {
-                  setTimerActive((v) => !v);
-                  if (!timerActive && timerSeconds === 0) setTimerSeconds(300);
-                }}
-                className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer",
-                  timerActive
-                    ? "bg-emerald-500 text-white shadow-sm"
-                    : "text-zinc-300 hover:text-white",
-                )}
-                title="5-Minute Turn Pace Timer"
-              >
-                <Hourglass className="h-3.5 w-3.5" />
-                <span>Turn: {formatTimer(timerSeconds)}</span>
-              </button>
-            </div>
-
-            {/* Content Mode Switcher (Both vs Translation Only vs Arabic Only) */}
-            <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
-              <button
-                onClick={() => setContentMode("both")}
-                className={cn(
-                  "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
-                  contentMode === "both"
-                    ? "bg-amber-500 text-black shadow-sm"
-                    : "text-zinc-400 hover:text-white",
-                )}
-                title="Show Arabic & Translation"
-              >
-                <Languages className="h-3.5 w-3.5" />
-                <span className="hidden xl:inline">Both</span>
-              </button>
-              <button
-                onClick={() => setContentMode("translation_only")}
-                className={cn(
-                  "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
-                  contentMode === "translation_only"
-                    ? "bg-amber-500 text-black shadow-sm"
-                    : "text-zinc-400 hover:text-white",
-                )}
-                title="Translation Only View (Focus on Understanding)"
-              >
-                <BookOpenText className="h-3.5 w-3.5" />
-                <span className="hidden xl:inline">Translation Only</span>
-              </button>
-              <button
-                onClick={() => setContentMode("arabic_only")}
-                className={cn(
-                  "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
-                  contentMode === "arabic_only"
-                    ? "bg-amber-500 text-black shadow-sm"
-                    : "text-zinc-400 hover:text-white",
-                )}
-                title="Arabic Only View"
-              >
-                <Type className="h-3.5 w-3.5" />
-                <span className="hidden xl:inline">Arabic Only</span>
-              </button>
+                {surahAr}
+              </span>
             </div>
           </div>
 
-          {/* Translation Picker: Choose from all 40+ translations */}
-          <div className="relative shrink-0">
-            <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
+          {/* Right: Projector Controls & Prominent Timers */}
+          <div className="flex items-center gap-1.5 flex-nowrap min-w-0">
+            {/* Scrollable core controls (no popovers here to avoid clipping) */}
+            <div className="flex items-center gap-1.5 flex-nowrap flex-1 min-w-0 overflow-x-auto">
+              {/* Content Mode Switcher (Both vs Translation Only vs Arabic Only) */}
+              <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
+                <button
+                  onClick={() => setContentMode("both")}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                    contentMode === "both"
+                      ? "bg-amber-500 text-black shadow-sm"
+                      : "text-zinc-400 hover:text-white",
+                  )}
+                  title="Show Arabic & Translation"
+                >
+                  <Languages className="h-3.5 w-3.5" />
+                  <span className="hidden xl:inline">Both</span>
+                </button>
+                <button
+                  onClick={() => setContentMode("translation_only")}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                    contentMode === "translation_only"
+                      ? "bg-amber-500 text-black shadow-sm"
+                      : "text-zinc-400 hover:text-white",
+                  )}
+                  title="Translation Only View (Focus on Understanding)"
+                >
+                  <BookOpenText className="h-3.5 w-3.5" />
+                  <span className="hidden xl:inline">Translation Only</span>
+                </button>
+                <button
+                  onClick={() => setContentMode("arabic_only")}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                    contentMode === "arabic_only"
+                      ? "bg-amber-500 text-black shadow-sm"
+                      : "text-zinc-400 hover:text-white",
+                  )}
+                  title="Arabic Only View"
+                >
+                  <Type className="h-3.5 w-3.5" />
+                  <span className="hidden xl:inline">Arabic Only</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Translation Picker: Choose from all 40+ translations */}
+            <div className="relative shrink-0">
+              <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
+                <button
+                  onClick={() => setShowTransPicker((v) => !v)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                    showTransPicker
+                      ? "bg-amber-500 text-black shadow-sm"
+                      : "text-zinc-400 hover:text-white",
+                  )}
+                  title={tr("present_translations")}
+                >
+                  <Languages className="h-3.5 w-3.5" />
+                  <span className="hidden xl:inline">{tr("present_translations")}</span>
+                </button>
+              </div>
+
+              {showTransPicker && (
+                <div className="absolute right-0 top-full mt-2 z-50 w-[min(90vw,22rem)] rounded-2xl border border-zinc-700 bg-zinc-900/95 backdrop-blur-xl shadow-2xl">
+                  <div className="flex items-center justify-between px-4 pt-3 pb-1 border-b border-zinc-800">
+                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                      {tr("present_translations")}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() =>
+                          setActiveTrans(
+                            selectedTrans?.length ? [...selectedTrans] : ["qarai", "jawadi"],
+                          )
+                        }
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
+                        title={tr("present_sync_reader")}
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        <span className="hidden sm:inline">{tr("present_sync_short")}</span>
+                      </button>
+                      <button
+                        onClick={() => setShowTransPicker(false)}
+                        className="flex items-center justify-center h-6 w-6 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
+                        title={tr("close_reader")}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="max-h-[70vh] overflow-y-auto p-3 space-y-3">
+                    {(Object.keys(TRANSLATIONS_BY_LANG) as TranslationLang[]).map((lg) => (
+                      <div key={lg} className="space-y-1.5">
+                        <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                          {LANG_LABELS[lg].en}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {TRANSLATIONS_BY_LANG[lg].map((t) => {
+                            const active = activeTrans.includes(t.id);
+                            return (
+                              <button
+                                key={t.id}
+                                type="button"
+                                title={t.translator}
+                                onClick={() =>
+                                  setActiveTrans((prev) =>
+                                    active ? prev.filter((x) => x !== t.id) : [...prev, t.id],
+                                  )
+                                }
+                                className={cn(
+                                  "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer",
+                                  active
+                                    ? "bg-amber-500/15 border-amber-500/60 text-amber-300"
+                                    : "border-zinc-700 text-zinc-400 hover:border-amber-500/40 hover:text-zinc-200",
+                                )}
+                              >
+                                {active && <Check className="h-3 w-3" />}
+                                {t.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* View Mode Switcher: 5-Verse Turn Block vs Single Verse */}
+            <div className="flex items-center shrink-0 bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
               <button
-                onClick={() => setShowTransPicker((v) => !v)}
+                onClick={() => setViewMode("turn_block")}
                 className={cn(
                   "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
-                  showTransPicker
+                  viewMode === "turn_block"
                     ? "bg-amber-500 text-black shadow-sm"
                     : "text-zinc-400 hover:text-white",
                 )}
-                title={tr("present_translations")}
+                title="5-Verse Turn Block View"
               >
-                <Languages className="h-3.5 w-3.5" />
-                <span className="hidden xl:inline">{tr("present_translations")}</span>
+                <Layers className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Turn Block</span>
+              </button>
+              <button
+                onClick={() => setViewMode("single_verse")}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                  viewMode === "single_verse"
+                    ? "bg-amber-500 text-black shadow-sm"
+                    : "text-zinc-400 hover:text-white",
+                )}
+                title="Single Verse View"
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Single Verse</span>
               </button>
             </div>
 
-            {showTransPicker && (
-              <div className="absolute right-0 top-full mt-2 z-50 w-[min(90vw,22rem)] rounded-2xl border border-zinc-700 bg-zinc-900/95 backdrop-blur-xl shadow-2xl">
-                <div className="flex items-center justify-between px-4 pt-3 pb-1 border-b border-zinc-800">
-                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                    {tr("present_translations")}
-                  </span>
-                  <div className="flex items-center gap-1">
+            {/* More Controls Popover (Theme, Font Sizes, Layout, Fullscreen) */}
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setShowMore((v) => !v)}
+                className={cn(
+                  "h-9 w-9 rounded-xl flex items-center justify-center border transition-all cursor-pointer",
+                  showMore
+                    ? "border-amber-500 bg-amber-500/15 text-amber-300"
+                    : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:text-white",
+                )}
+                title={lang === "en" ? "More Controls" : "مزید کنٹرولز"}
+              >
+                <Settings2 className="h-4 w-4" />
+              </button>
+
+              {showMore && (
+                <div className="absolute right-0 top-full mt-2 z-50 w-[min(90vw,20rem)] rounded-2xl border border-zinc-700 bg-zinc-900/95 backdrop-blur-xl shadow-2xl">
+                  <div className="flex items-center justify-between px-4 pt-3 pb-1 border-b border-zinc-800">
+                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                      {lang === "en" ? "Presentation Controls" : "پریزنٹیشن کنٹرولز"}
+                    </span>
                     <button
-                      onClick={() =>
-                        setActiveTrans(
-                          selectedTrans?.length ? [...selectedTrans] : ["qarai", "jawadi"],
-                        )
-                      }
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
-                      title={tr("present_sync_reader")}
-                    >
-                      <RotateCcw className="h-3 w-3" />
-                      <span className="hidden sm:inline">{tr("present_sync_short")}</span>
-                    </button>
-                    <button
-                      onClick={() => setShowTransPicker(false)}
+                      onClick={() => setShowMore(false)}
                       className="flex items-center justify-center h-6 w-6 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
-                      title={tr("close_reader")}
+                      title={lang === "en" ? "Close" : "بند کریں"}
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                </div>
-                <div className="max-h-[70vh] overflow-y-auto p-3 space-y-3">
-                  {(Object.keys(TRANSLATIONS_BY_LANG) as TranslationLang[]).map((lg) => (
-                    <div key={lg} className="space-y-1.5">
-                      <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
-                        {LANG_LABELS[lg].en}
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {TRANSLATIONS_BY_LANG[lg].map((t) => {
-                          const active = activeTrans.includes(t.id);
-                          return (
-                            <button
-                              key={t.id}
-                              type="button"
-                              title={t.translator}
-                              onClick={() =>
-                                setActiveTrans((prev) =>
-                                  active ? prev.filter((x) => x !== t.id) : [...prev, t.id],
-                                )
-                              }
-                              className={cn(
-                                "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer",
-                                active
-                                  ? "bg-amber-500/15 border-amber-500/60 text-amber-300"
-                                  : "border-zinc-700 text-zinc-400 hover:border-amber-500/40 hover:text-zinc-200",
-                              )}
-                            >
-                              {active && <Check className="h-3 w-3" />}
-                              {t.name}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* View Mode Switcher: 5-Verse Turn Block vs Single Verse */}
-          <div className="flex items-center shrink-0 bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1">
-            <button
-              onClick={() => setViewMode("turn_block")}
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
-                viewMode === "turn_block"
-                  ? "bg-amber-500 text-black shadow-sm"
-                  : "text-zinc-400 hover:text-white",
-              )}
-              title="5-Verse Turn Block View"
-            >
-              <Layers className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Turn Block</span>
-            </button>
-            <button
-              onClick={() => setViewMode("single_verse")}
-              className={cn(
-                "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
-                viewMode === "single_verse"
-                  ? "bg-amber-500 text-black shadow-sm"
-                  : "text-zinc-400 hover:text-white",
-              )}
-              title="Single Verse View"
-            >
-              <BookOpen className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Single Verse</span>
-            </button>
-          </div>
-
-          {/* More Controls Popover (Theme, Font Sizes, Layout, Fullscreen) */}
-          <div className="relative shrink-0">
-            <button
-              onClick={() => setShowMore((v) => !v)}
-              className={cn(
-                "h-9 w-9 rounded-xl flex items-center justify-center border transition-all cursor-pointer",
-                showMore
-                  ? "border-amber-500 bg-amber-500/15 text-amber-300"
-                  : "border-zinc-800 bg-zinc-900 text-zinc-300 hover:text-white",
-              )}
-              title={lang === "en" ? "More Controls" : "مزید کنٹرولز"}
-            >
-              <Settings2 className="h-4 w-4" />
-            </button>
-
-            {showMore && (
-              <div className="absolute right-0 top-full mt-2 z-50 w-[min(90vw,20rem)] rounded-2xl border border-zinc-700 bg-zinc-900/95 backdrop-blur-xl shadow-2xl">
-                <div className="flex items-center justify-between px-4 pt-3 pb-1 border-b border-zinc-800">
-                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                    {lang === "en" ? "Presentation Controls" : "پریزنٹیشن کنٹرولز"}
-                  </span>
-                  <button
-                    onClick={() => setShowMore(false)}
-                    className="flex items-center justify-center h-6 w-6 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer"
-                    title={lang === "en" ? "Close" : "بند کریں"}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                <div className="p-4 space-y-5">
-                  {/* Theme Selector */}
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
-                      {lang === "en" ? "Theme" : "تھیم"}
-                    </div>
-                    <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 gap-1 w-fit">
-                      <button
-                        onClick={() => setThemeStyle("light")}
-                        className={cn(
-                          "w-6 h-6 rounded-lg bg-slate-100 border transition-all cursor-pointer",
-                          themeStyle === "light"
-                            ? "border-amber-600 ring-1 ring-amber-600"
-                            : "border-slate-300",
-                        )}
-                        title="Light Clean Theme"
-                      />
-                      <button
-                        onClick={() => setThemeStyle("parchment")}
-                        className={cn(
-                          "w-6 h-6 rounded-lg bg-[#f5efdf] border transition-all cursor-pointer",
-                          themeStyle === "parchment"
-                            ? "border-amber-700 ring-1 ring-amber-700"
-                            : "border-[#dfd3b9]",
-                        )}
-                        title="Parchment Reading Theme"
-                      />
-                      <button
-                        onClick={() => setThemeStyle("emerald")}
-                        className={cn(
-                          "w-6 h-6 rounded-lg bg-emerald-950 border transition-all cursor-pointer",
-                          themeStyle === "emerald"
-                            ? "border-amber-400 ring-1 ring-amber-400"
-                            : "border-emerald-800",
-                        )}
-                        title="Emerald Theme"
-                      />
-                      <button
-                        onClick={() => setThemeStyle("midnight")}
-                        className={cn(
-                          "w-6 h-6 rounded-lg bg-slate-900 border transition-all cursor-pointer",
-                          themeStyle === "midnight"
-                            ? "border-gold ring-1 ring-gold"
-                            : "border-slate-700",
-                        )}
-                        title="Midnight Dark Theme"
-                      />
-                      <button
-                        onClick={() => setThemeStyle("oled")}
-                        className={cn(
-                          "w-6 h-6 rounded-lg bg-black border transition-all cursor-pointer",
-                          themeStyle === "oled"
-                            ? "border-yellow-400 ring-1 ring-yellow-400"
-                            : "border-zinc-700",
-                        )}
-                        title="High-Contrast OLED Theme"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Arabic Font Size Scaler */}
-                  {contentMode !== "translation_only" && (
+                  <div className="p-4 space-y-5">
+                    {/* Theme Selector */}
                     <div className="space-y-2">
                       <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
-                        {lang === "en" ? "Arabic Font Size" : "عربی فونٹ سائز"}
+                        {lang === "en" ? "Theme" : "تھیم"}
                       </div>
-                      <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl px-2 py-1 gap-1 w-fit">
-                        <Type className="h-3.5 w-3.5 text-amber-400" />
-                        <span className="text-[10px] font-bold text-amber-300 uppercase">Ar</span>
+                      <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 gap-1 w-fit">
                         <button
-                          onClick={() => setArabicFontRem((s) => Math.max(2.0, s - 0.4))}
-                          className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
-                          title="Decrease Arabic Font Size"
-                        >
-                          A-
-                        </button>
-                        <span className="text-[10px] font-mono text-zinc-500">
-                          {arabicFontRem.toFixed(1)}
-                        </span>
+                          onClick={() => setThemeStyle("light")}
+                          className={cn(
+                            "w-6 h-6 rounded-lg bg-slate-100 border transition-all cursor-pointer",
+                            themeStyle === "light"
+                              ? "border-amber-600 ring-1 ring-amber-600"
+                              : "border-slate-300",
+                          )}
+                          title="Light Clean Theme"
+                        />
                         <button
-                          onClick={() => setArabicFontRem((s) => Math.min(6.0, s + 0.4))}
-                          className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
-                          title="Increase Arabic Font Size"
-                        >
-                          A+
-                        </button>
+                          onClick={() => setThemeStyle("parchment")}
+                          className={cn(
+                            "w-6 h-6 rounded-lg bg-[#f5efdf] border transition-all cursor-pointer",
+                            themeStyle === "parchment"
+                              ? "border-amber-700 ring-1 ring-amber-700"
+                              : "border-[#dfd3b9]",
+                          )}
+                          title="Parchment Reading Theme"
+                        />
+                        <button
+                          onClick={() => setThemeStyle("emerald")}
+                          className={cn(
+                            "w-6 h-6 rounded-lg bg-emerald-950 border transition-all cursor-pointer",
+                            themeStyle === "emerald"
+                              ? "border-amber-400 ring-1 ring-amber-400"
+                              : "border-emerald-800",
+                          )}
+                          title="Emerald Theme"
+                        />
+                        <button
+                          onClick={() => setThemeStyle("midnight")}
+                          className={cn(
+                            "w-6 h-6 rounded-lg bg-slate-900 border transition-all cursor-pointer",
+                            themeStyle === "midnight"
+                              ? "border-gold ring-1 ring-gold"
+                              : "border-slate-700",
+                          )}
+                          title="Midnight Dark Theme"
+                        />
+                        <button
+                          onClick={() => setThemeStyle("oled")}
+                          className={cn(
+                            "w-6 h-6 rounded-lg bg-black border transition-all cursor-pointer",
+                            themeStyle === "oled"
+                              ? "border-yellow-400 ring-1 ring-yellow-400"
+                              : "border-zinc-700",
+                          )}
+                          title="High-Contrast OLED Theme"
+                        />
                       </div>
                     </div>
-                  )}
 
-                  {/* Translation Font Size Scaler */}
-                  {contentMode !== "arabic_only" && (
-                    <div className="space-y-2">
-                      <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
-                        {lang === "en" ? "Translation Font Size" : "ترجمہ فونٹ سائز"}
-                      </div>
-                      <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl px-2 py-1 gap-1 w-fit">
-                        <BookOpenText className="h-3.5 w-3.5 text-emerald-400" />
-                        <span className="text-[10px] font-bold text-emerald-300 uppercase">Tr</span>
-                        <button
-                          onClick={() => setTransFontRem((s) => Math.max(0.6, s - 0.2))}
-                          className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
-                          title="Decrease Translation Font Size"
-                        >
-                          A-
-                        </button>
-                        <span className="text-[10px] font-mono text-zinc-500">
-                          {transFontRem.toFixed(1)}
-                        </span>
-                        <button
-                          onClick={() => setTransFontRem((s) => Math.min(8.0, s + 0.2))}
-                          className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
-                          title="Increase Translation Font Size"
-                        >
-                          A+
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Favorite Size Preset */}
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
-                      {lang === "en" ? "Size Preset" : "سائز پری سیٹ"}
-                    </div>
-                    <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 gap-1 w-fit">
-                      <button
-                        onClick={() => setUseFavorite(false)}
-                        className={cn(
-                          "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
-                          !useFavorite
-                            ? "bg-amber-500 text-black shadow-sm"
-                            : "text-zinc-400 hover:text-white",
-                        )}
-                        title={lang === "en" ? "Use Standard Sizes" : "معیاری سائز استعمال کریں"}
-                      >
-                        {lang === "en" ? "Standard" : "معیاری"}
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (!favSizes) return;
-                          setArabicFontRem(favSizes.ar);
-                          setTransFontRem(favSizes.tr);
-                          setUseFavorite(true);
-                        }}
-                        disabled={!favSizes}
-                        className={cn(
-                          "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-40",
-                          useFavorite
-                            ? "bg-emerald-500 text-white shadow-sm"
-                            : "text-zinc-400 hover:text-white",
-                        )}
-                        title={
-                          favSizes
-                            ? `${lang === "en" ? "Apply AR" : "لگائیں AR"} ${favSizes.ar.toFixed(1)} · TR ${favSizes.tr.toFixed(1)}`
-                            : lang === "en"
-                              ? "No favorite saved yet"
-                              : "ابھی کوئی پسندیدہ محفوظ نہیں"
-                        }
-                      >
-                        {lang === "en" ? "My Favorite" : "میرا پسندیدہ"}
-                      </button>
-                    </div>
-                    {favSizes && (
-                      <div className="text-[10px] font-mono text-zinc-500">
-                        AR {favSizes.ar.toFixed(1)} · TR {favSizes.tr.toFixed(1)}
+                    {/* Arabic Font Size Scaler */}
+                    {contentMode !== "translation_only" && (
+                      <div className="space-y-2">
+                        <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                          {lang === "en" ? "Arabic Font Size" : "عربی فونٹ سائز"}
+                        </div>
+                        <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl px-2 py-1 gap-1 w-fit">
+                          <Type className="h-3.5 w-3.5 text-amber-400" />
+                          <span className="text-[10px] font-bold text-amber-300 uppercase">Ar</span>
+                          <button
+                            onClick={() => setArabicFontRem((s) => Math.max(2.0, s - 0.4))}
+                            className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
+                            title="Decrease Arabic Font Size"
+                          >
+                            A-
+                          </button>
+                          <span className="text-[10px] font-mono text-zinc-500">
+                            {arabicFontRem.toFixed(1)}
+                          </span>
+                          <button
+                            onClick={() => setArabicFontRem((s) => Math.min(6.0, s + 0.4))}
+                            className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
+                            title="Increase Arabic Font Size"
+                          >
+                            A+
+                          </button>
+                        </div>
                       </div>
                     )}
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          saveFavoriteSizes(arabicFontRem, transFontRem);
-                          setFavSizes({ ar: arabicFontRem, tr: transFontRem });
-                          setUseFavorite(true);
-                        }}
-                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/40 hover:bg-amber-500/20 transition-all cursor-pointer"
-                        title={
-                          lang === "en"
-                            ? "Save current sizes as your favorite"
-                            : "موجودہ سائز کو پسندیدہ کے طور پر محفوظ کریں"
-                        }
-                      >
-                        <Check className="h-3 w-3" />
-                        {lang === "en" ? "Save Current Sizes" : "موجودہ سائز محفوظ کریں"}
-                      </button>
-                      {favSizes && (
+
+                    {/* Translation Font Size Scaler */}
+                    {contentMode !== "arabic_only" && (
+                      <div className="space-y-2">
+                        <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                          {lang === "en" ? "Translation Font Size" : "ترجمہ فونٹ سائز"}
+                        </div>
+                        <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl px-2 py-1 gap-1 w-fit">
+                          <BookOpenText className="h-3.5 w-3.5 text-emerald-400" />
+                          <span className="text-[10px] font-bold text-emerald-300 uppercase">
+                            Tr
+                          </span>
+                          <button
+                            onClick={() => setTransFontRem((s) => Math.max(0.6, s - 0.2))}
+                            className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
+                            title="Decrease Translation Font Size"
+                          >
+                            A-
+                          </button>
+                          <span className="text-[10px] font-mono text-zinc-500">
+                            {transFontRem.toFixed(1)}
+                          </span>
+                          <button
+                            onClick={() => setTransFontRem((s) => Math.min(8.0, s + 0.2))}
+                            className="text-xs font-bold px-1.5 py-0.5 rounded text-zinc-300 hover:text-white cursor-pointer"
+                            title="Increase Translation Font Size"
+                          >
+                            A+
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Favorite Size Preset */}
+                    <div className="space-y-2">
+                      <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                        {lang === "en" ? "Size Preset" : "سائز پری سیٹ"}
+                      </div>
+                      <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 gap-1 w-fit">
+                        <button
+                          onClick={() => setUseFavorite(false)}
+                          className={cn(
+                            "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                            !useFavorite
+                              ? "bg-amber-500 text-black shadow-sm"
+                              : "text-zinc-400 hover:text-white",
+                          )}
+                          title={lang === "en" ? "Use Standard Sizes" : "معیاری سائز استعمال کریں"}
+                        >
+                          {lang === "en" ? "Standard" : "معیاری"}
+                        </button>
                         <button
                           onClick={() => {
-                            clearFavoriteSizes();
-                            setFavSizes(null);
-                            setUseFavorite(false);
+                            if (!favSizes) return;
+                            setArabicFontRem(favSizes.ar);
+                            setTransFontRem(favSizes.tr);
+                            setUseFavorite(true);
                           }}
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-zinc-400 hover:text-red-400 border border-zinc-800 hover:border-red-500/40 transition-all cursor-pointer"
-                          title={lang === "en" ? "Remove favorite" : "پسندیدہ ہٹائیں"}
+                          disabled={!favSizes}
+                          className={cn(
+                            "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-40",
+                            useFavorite
+                              ? "bg-emerald-500 text-white shadow-sm"
+                              : "text-zinc-400 hover:text-white",
+                          )}
+                          title={
+                            favSizes
+                              ? `${lang === "en" ? "Apply AR" : "لگائیں AR"} ${favSizes.ar.toFixed(1)} · TR ${favSizes.tr.toFixed(1)}`
+                              : lang === "en"
+                                ? "No favorite saved yet"
+                                : "ابھی کوئی پسندیدہ محفوظ نہیں"
+                          }
                         >
-                          <X className="h-3 w-3" />
-                          {lang === "en" ? "Remove" : "ہٹائیں"}
+                          {lang === "en" ? "My Favorite" : "میرا پسندیدہ"}
                         </button>
+                      </div>
+                      {favSizes && (
+                        <div className="text-[10px] font-mono text-zinc-500">
+                          AR {favSizes.ar.toFixed(1)} · TR {favSizes.tr.toFixed(1)}
+                        </div>
                       )}
-                    </div>
-                  </div>
-
-                  {/* Layout Width Switcher */}
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
-                      {lang === "en" ? "Layout Width" : "لی آؤٹ چوڑائی"}
-                    </div>
-                    <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 gap-1 w-fit">
-                      <button
-                        onClick={() => setLayoutWidth("wide")}
-                        className={cn(
-                          "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
-                          layoutWidth === "wide"
-                            ? "bg-emerald-500 text-white shadow-sm"
-                            : "text-zinc-400 hover:text-white",
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            saveFavoriteSizes(arabicFontRem, transFontRem);
+                            setFavSizes({ ar: arabicFontRem, tr: transFontRem });
+                            setUseFavorite(true);
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/40 hover:bg-amber-500/20 transition-all cursor-pointer"
+                          title={
+                            lang === "en"
+                              ? "Save current sizes as your favorite"
+                              : "موجودہ سائز کو پسندیدہ کے طور پر محفوظ کریں"
+                          }
+                        >
+                          <Check className="h-3 w-3" />
+                          {lang === "en" ? "Save Current Sizes" : "موجودہ سائز محفوظ کریں"}
+                        </button>
+                        {favSizes && (
+                          <button
+                            onClick={() => {
+                              clearFavoriteSizes();
+                              setFavSizes(null);
+                              setUseFavorite(false);
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold text-zinc-400 hover:text-red-400 border border-zinc-800 hover:border-red-500/40 transition-all cursor-pointer"
+                            title={lang === "en" ? "Remove favorite" : "پسندیدہ ہٹائیں"}
+                          >
+                            <X className="h-3 w-3" />
+                            {lang === "en" ? "Remove" : "ہٹائیں"}
+                          </button>
                         )}
-                        title="Wide HD Layout (Uses Full Screen Space for 5 Verses)"
-                      >
-                        <Columns className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Wide HD</span>
-                      </button>
-                      <button
-                        onClick={() => setLayoutWidth("centered")}
-                        className={cn(
-                          "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
-                          layoutWidth === "centered"
-                            ? "bg-emerald-500 text-white shadow-sm"
-                            : "text-zinc-400 hover:text-white",
-                        )}
-                        title="Centered Focus Layout"
-                      >
-                        <Monitor className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Centered</span>
-                      </button>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Fullscreen Toggle */}
-                  <div className="pt-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={toggleFullscreen}
-                      className="w-full rounded-xl border-zinc-700 bg-zinc-950 text-zinc-300 hover:text-white cursor-pointer gap-2"
-                    >
-                      {isFullscreen ? (
-                        <Minimize2 className="h-4 w-4" />
-                      ) : (
-                        <Maximize2 className="h-4 w-4" />
-                      )}
-                      <span>
-                        {isFullscreen
-                          ? lang === "en"
-                            ? "Exit Fullscreen"
-                            : "فل اسکرین بند کریں"
-                          : lang === "en"
-                            ? "Enter Fullscreen"
-                            : "فل اسکرین کریں"}
-                      </span>
-                    </Button>
+                    {/* Layout Width Switcher */}
+                    <div className="space-y-2">
+                      <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+                        {lang === "en" ? "Layout Width" : "لی آؤٹ چوڑائی"}
+                      </div>
+                      <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 gap-1 w-fit">
+                        <button
+                          onClick={() => setLayoutWidth("wide")}
+                          className={cn(
+                            "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                            layoutWidth === "wide"
+                              ? "bg-emerald-500 text-white shadow-sm"
+                              : "text-zinc-400 hover:text-white",
+                          )}
+                          title="Wide HD Layout (Uses Full Screen Space for 5 Verses)"
+                        >
+                          <Columns className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Wide HD</span>
+                        </button>
+                        <button
+                          onClick={() => setLayoutWidth("centered")}
+                          className={cn(
+                            "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1",
+                            layoutWidth === "centered"
+                              ? "bg-emerald-500 text-white shadow-sm"
+                              : "text-zinc-400 hover:text-white",
+                          )}
+                          title="Centered Focus Layout"
+                        >
+                          <Monitor className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Centered</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Fullscreen Toggle */}
+                    <div className="pt-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={toggleFullscreen}
+                        className="w-full rounded-xl border-zinc-700 bg-zinc-950 text-zinc-300 hover:text-white cursor-pointer gap-2"
+                      >
+                        {isFullscreen ? (
+                          <Minimize2 className="h-4 w-4" />
+                        ) : (
+                          <Maximize2 className="h-4 w-4" />
+                        )}
+                        <span>
+                          {isFullscreen
+                            ? lang === "en"
+                              ? "Exit Fullscreen"
+                              : "فل اسکرین بند کریں"
+                            : lang === "en"
+                              ? "Enter Fullscreen"
+                              : "فل اسکرین کریں"}
+                        </span>
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+            </div>
+
+            {/* Close Projector Mode */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              className="h-9 w-9 shrink-0 rounded-xl text-zinc-400 hover:text-red-400 hover:bg-red-500/10 cursor-pointer"
+              title={lang === "en" ? "Exit Presentation Mode (Esc)" : "بند کریں"}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Row 2: Prominent Timer Dock */}
+        <div
+          className={cn(
+            "flex items-center justify-between gap-3 px-6 py-2 border-t",
+            currentTheme.border,
+            currentTheme.cardBg,
+          )}
+        >
+          <div className="flex items-center gap-2.5 min-w-0 overflow-x-auto">
+            {renderTimerCard(
+              lang === "en" ? "Session" : "سیشن",
+              Clock,
+              sessionTimer,
+              3600,
+              sessionActive,
+              () => {
+                if (sessionTimer === 0) {
+                  setSessionTimer(3600);
+                  setSessionActive(true);
+                } else {
+                  setSessionActive((v) => !v);
+                }
+              },
+              () => {
+                setSessionTimer(3600);
+                setSessionActive(false);
+              },
+              "bg-amber-500/15 border-amber-500/40 text-amber-400",
+              "bg-amber-500",
+              "1-Hour Session Timer (Click to Play/Pause)",
+            )}
+            {renderTimerCard(
+              lang === "en" ? "Q&A" : "سوال و جواب",
+              MessageSquare,
+              qaTimer,
+              900,
+              qaActive,
+              () => {
+                if (qaTimer === 0) {
+                  setQaTimer(900);
+                  setQaActive(true);
+                } else {
+                  setQaActive((v) => !v);
+                }
+              },
+              () => {
+                setQaTimer(900);
+                setQaActive(false);
+              },
+              "bg-blue-500/15 border-blue-500/40 text-blue-400",
+              "bg-blue-500",
+              "Circle Q&A Timer (Click to Play/Pause)",
+            )}
+            {renderTimerCard(
+              lang === "en" ? "Turn" : "ٹرن",
+              Hourglass,
+              timerSeconds,
+              300,
+              timerActive,
+              () => {
+                if (timerSeconds === 0) {
+                  setTimerSeconds(300);
+                  setTimerActive(true);
+                } else {
+                  setTimerActive((v) => !v);
+                }
+              },
+              () => {
+                setTimerSeconds(300);
+                setTimerActive(false);
+              },
+              "bg-emerald-500/15 border-emerald-500/40 text-emerald-400",
+              "bg-emerald-500",
+              "5-Minute Turn Pace Timer (Click to Play/Pause)",
             )}
           </div>
 
-          {/* Close Projector Mode */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="h-9 w-9 shrink-0 rounded-xl text-zinc-400 hover:text-red-400 hover:bg-red-500/10 cursor-pointer"
-            title={lang === "en" ? "Exit Presentation Mode (Esc)" : "بند کریں"}
+          {/* Sound Alert Mute Toggle */}
+          <button
+            onClick={() => setSoundEnabled((v) => !v)}
+            className={cn(
+              "flex shrink-0 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-xs font-bold transition-all cursor-pointer",
+              currentTheme.border,
+              soundEnabled
+                ? "text-emerald-400 hover:text-emerald-300"
+                : "text-zinc-500 hover:text-zinc-300",
+            )}
+            title={
+              soundEnabled
+                ? lang === "en"
+                  ? "Expiry beep is ON — click to mute"
+                  : "اختتامی آواز آن ہے — بند کرنے کے لیے کلک کریں"
+                : lang === "en"
+                  ? "Expiry beep is OFF — click to enable"
+                  : "اختتامی آواز بند ہے — چالو کرنے کے لیے کلک کریں"
+            }
           >
-            <X className="h-5 w-5" />
-          </Button>
+            {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            <span className="hidden md:inline">{lang === "en" ? "Beep" : "آواز"}</span>
+          </button>
         </div>
       </div>
 
