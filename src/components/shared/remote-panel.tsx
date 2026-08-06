@@ -2,25 +2,38 @@ import { useMemo, useState } from "react";
 import QRCode from "react-qr-code";
 import { Check, Copy, Smartphone, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { remoteUrlForRoom, type RoomMember } from "@/lib/remote-control";
+import { remoteUrlForRoom, type RemoteError, type RoomMember } from "@/lib/remote-control";
+
+const ERROR_TEXT: Record<RemoteError["kind"], string> = {
+  auth: "App key was rejected — check VITE_ABLY_KEY.",
+  permission: "App key isn't allowed to open this room.",
+  presence: "Couldn't join the room's connection list.",
+  attach: "Couldn't open the room.",
+  network: "Can't reach the pairing service — check internet.",
+  unknown: "Something went wrong connecting.",
+};
 
 export function RemotePanel({
   lang,
   room,
   status,
   members,
+  error,
   onClose,
 }: {
   lang: string;
   room: string;
   status: string;
   members: RoomMember[];
+  error?: RemoteError | null;
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const url = useMemo(() => remoteUrlForRoom(room), [room]);
   const remoteCount = members.filter((m) => m.role === "remote").length;
   const isEn = lang === "en";
+  const isLocalhost =
+    typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
   const copyLink = async () => {
     try {
@@ -56,29 +69,49 @@ export function RemotePanel({
         <div
           className={cn(
             "mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold",
-            status === "connected"
-              ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
-              : "border-amber-500/50 bg-amber-500/10 text-amber-400",
+            error
+              ? "border-red-500/50 bg-red-500/10 text-red-400"
+              : status === "connected"
+                ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
+                : status === "not-configured"
+                  ? "border-red-500/50 bg-red-500/10 text-red-400"
+                  : "border-amber-500/50 bg-amber-500/10 text-amber-400",
           )}
         >
           <span
             className={cn(
               "h-2 w-2 rounded-full",
-              status === "connected" ? "bg-emerald-400" : "bg-amber-400 animate-pulse",
+              error
+                ? "bg-red-400"
+                : status === "connected"
+                  ? "bg-emerald-400"
+                  : "bg-amber-400 animate-pulse",
             )}
           />
-          {status === "connected"
+          {error
             ? isEn
-              ? "Connected — ready to pair"
-              : "منسلک — جوڑنے کے لیے تیار"
-            : status === "not-configured"
+              ? ERROR_TEXT[error.kind]
+              : "رابطہ ناکام"
+            : status === "connected"
               ? isEn
-                ? "Remote not configured (missing key)"
-                : "ریموٹ ترتیب نہیں ہے (کلید غائب)"
-              : isEn
-                ? "Connecting…"
-                : "منسلک ہو رہا ہے…"}
+                ? "Connected — ready to pair"
+                : "منسلک — جوڑنے کے لیے تیار"
+              : status === "not-configured"
+                ? isEn
+                  ? "Remote not configured (missing key)"
+                  : "ریموٹ ترتیب نہیں ہے (کلید غائب)"
+                : isEn
+                  ? "Connecting…"
+                  : "منسلک ہو رہا ہے…"}
         </div>
+
+        {isLocalhost && (
+          <div className="mt-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-300">
+            {isEn
+              ? "This page is running locally, so the QR code won't work on your phone. Open quran-parho.vercel.app/remote on your phone and type the room code below."
+              : "یہ صفحہ مقامی طور پر چل رہا ہے، اس لیے کیو آر کوڈ فون پر کام نہیں کرے گا۔ فون پر quran-parho.vercel.app/remote کھولیں اور نیچے روم کوڈ درج کریں۔"}
+          </div>
+        )}
 
         <div className="mt-5 flex justify-center">
           <div className="rounded-2xl bg-white p-4 shadow-xl ring-1 ring-zinc-300">

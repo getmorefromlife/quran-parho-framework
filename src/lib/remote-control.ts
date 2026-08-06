@@ -27,11 +27,20 @@ export type RemoteMessage = RemoteCommand | RemoteState;
 
 export type RoomMember = { role: RemoteRole; clientId: string };
 
+export type RemoteErrorKind = "auth" | "permission" | "presence" | "attach" | "network" | "unknown";
+
+export type RemoteError = {
+  kind: RemoteErrorKind;
+  fatal: boolean;
+  message: string;
+};
+
 export type RemoteRoomEvents = {
   onState?: (state: RemoteState) => void;
   onCommand?: (command: RemoteCommand) => void;
   onMembers?: (members: RoomMember[]) => void;
   onConnectionState?: (state: string) => void;
+  onError?: (error: RemoteError) => void;
 };
 
 export type RemoteRoom = {
@@ -68,6 +77,26 @@ export function normalizeRoom(code: string): string {
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, 8);
+}
+
+function describeError(e: unknown): RemoteError {
+  const err = e as { code?: number; statusCode?: number; message?: string } | undefined;
+  const code = err?.code ?? 0;
+  const status = err?.statusCode ?? 0;
+  const message = err?.message ?? String(e ?? "unknown error");
+  if ((status >= 401 && status < 403) || (code >= 40100 && code < 40300)) {
+    return { kind: "auth", fatal: true, message };
+  }
+  if (status === 403 || (code >= 40300 && code < 40400)) {
+    return { kind: "permission", fatal: true, message };
+  }
+  if (code === 40012) {
+    return { kind: "presence", fatal: false, message };
+  }
+  if (code >= 80000 || status === 0) {
+    return { kind: "network", fatal: false, message };
+  }
+  return { kind: "unknown", fatal: false, message };
 }
 
 export function remoteUrlForRoom(room: string): string {
@@ -115,10 +144,17 @@ export async function openRemoteRoom(
 
   realtime.connection.on((change) => {
     events.onConnectionState?.(change.current);
+    if (change.current === "failed" || (change.current === "disconnected" && change.reason)) {
+      events.onError?.(describeError(change.reason));
+    }
   });
 
-  await channel.attach().catch(() => undefined);
-  await channel.presence.enter({ role }).catch(() => undefined);
+  await channel.attach().catch((e) => {
+    events.onError?.(describeError(e));
+  });
+  await channel.presence.enter({ role }).catch((e) => {
+    events.onError?.(describeError(e));
+  });
   void refreshMembers();
 
   const publish = (msg: RemoteMessage) => {

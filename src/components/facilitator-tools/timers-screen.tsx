@@ -254,6 +254,7 @@ export function TimersScreen({ lang, onClose }: { lang: string; onClose: () => v
           room={remote.roomCode}
           status={remote.status}
           members={remote.members}
+          error={remote.error}
           onClose={() => remote.setPanelOpen(false)}
         />
       )}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -24,6 +24,7 @@ import {
   normalizeRoom,
   openRemoteRoom,
   type RemoteCommand,
+  type RemoteError,
   type RemoteRoom,
   type RemoteState,
   type RoomMember,
@@ -230,12 +231,15 @@ function RemotePage() {
   const [state, setState] = useState<RemoteState | null>(null);
   const [members, setMembers] = useState<RoomMember[]>([]);
   const [status, setStatus] = useState("connecting");
+  const [error, setError] = useState<RemoteError | null>(null);
 
   useEffect(() => {
     if (!room) return;
     let cancelled = false;
     let handle: RemoteRoom | null = null;
     setState(null);
+    setStatus("connecting");
+    setError(null);
     openRemoteRoom(room, "remote", {
       onState: (s) => {
         if (!cancelled) setState(s);
@@ -245,6 +249,9 @@ function RemotePage() {
       },
       onConnectionState: (s) => {
         if (!cancelled) setStatus(s);
+      },
+      onError: (e) => {
+        if (!cancelled) setError(e);
       },
     }).then((opened) => {
       if (cancelled) {
@@ -264,10 +271,31 @@ function RemotePage() {
     };
   }, [room]);
 
-  const send = (cmd: RemoteCommand) => roomHandle?.publish(cmd);
-
   const hasHost = members.some((m) => m.role === "host");
   const connected = status === "connected";
+  const connecting = !connected && status !== "failed" && !error;
+  const failed = error !== null || status === "failed";
+  // A state message only ever comes from the host, so treat it as proof the
+  // host is paired even if presence membership is momentarily stale.
+  const hostOnline = connected && (hasHost || state !== null);
+
+  // Commands sent while the host is offline are buffered and flushed on connect,
+  // so "will apply as soon as it comes online" is actually true.
+  const pendingRef = useRef<RemoteCommand[]>([]);
+  const send = (cmd: RemoteCommand) => {
+    if (hostOnline && roomHandle) {
+      roomHandle.publish(cmd);
+    } else {
+      pendingRef.current.push(cmd);
+    }
+  };
+
+  useEffect(() => {
+    if (!hostOnline || !roomHandle || pendingRef.current.length === 0) return;
+    const pending = pendingRef.current;
+    pendingRef.current = [];
+    for (const cmd of pending) roomHandle.publish(cmd);
+  }, [hostOnline, roomHandle]);
 
   const connect = (code: string) => {
     const normalized = normalizeRoom(code);
@@ -348,7 +376,6 @@ function RemotePage() {
   }
 
   // ── Connected control page ──
-  const hostOnline = connected && hasHost;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -368,17 +395,29 @@ function RemotePage() {
             <div
               className={cn(
                 "flex items-center justify-center gap-1.5 text-[11px] font-semibold",
-                hostOnline ? "text-emerald-400" : "text-amber-400",
+                failed ? "text-red-400" : hostOnline ? "text-emerald-400" : "text-amber-400",
               )}
             >
-              {hostOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-              {hostOnline
+              {hostOnline || connecting ? (
+                <Wifi className="h-3 w-3" />
+              ) : (
+                <WifiOff className="h-3 w-3" />
+              )}
+              {failed
                 ? isEn
-                  ? "Host connected"
-                  : "میزبان منسلک"
-                : isEn
-                  ? "Waiting for host…"
-                  : "میزبان کا انتظار…"}
+                  ? "Connection failed"
+                  : "رابطہ ناکام"
+                : connecting
+                  ? isEn
+                    ? "Connecting…"
+                    : "منسلک ہو رہا ہے…"
+                  : hostOnline
+                    ? isEn
+                      ? "Host connected"
+                      : "میزبان منسلک"
+                    : isEn
+                      ? "Waiting for host…"
+                      : "میزبان کا انتظار…"}
             </div>
           </div>
           <button
@@ -401,11 +440,22 @@ function RemotePage() {
         )}
 
         {configured && !hostOnline && (
-          <div className="flex items-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+          <div
+            className={cn(
+              "flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm",
+              failed
+                ? "border-red-500/40 bg-red-500/10 text-red-300"
+                : "border-amber-500/40 bg-amber-500/10 text-amber-300",
+            )}
+          >
             <WifiOff className="h-5 w-5 shrink-0" />
-            {isEn
-              ? "The projector host is not connected. Your commands will apply as soon as it comes online."
-              : "پروجیکٹر میزبان منسلک نہیں ہے۔ آن ہونے پر آپ کے احکامات لاگو ہوں گے۔"}
+            {failed
+              ? isEn
+                ? `Can't reach the pairing service (${error?.kind ?? "connection"}). Check your internet and try again.`
+                : "پیرنگ سروس تک رسائی نہیں ہو سکی۔ انٹرنیٹ چیک کریں اور دوبارہ کوشش کریں۔"
+              : isEn
+                ? "The host is not connected yet. Your commands will be sent as soon as it comes online."
+                : "میزبان ابھی منسلک نہیں۔ آن ہونے پر آپ کے احکامات بھیج دیے جائیں گے۔"}
           </div>
         )}
 

@@ -4,6 +4,7 @@ import {
   isRemoteConfigured,
   openRemoteRoom,
   type RemoteCommand,
+  type RemoteError,
   type RemoteRoom,
   type RemoteState,
   type RoomMember,
@@ -27,6 +28,7 @@ export function useRemoteHost({
   const [status, setStatus] = useState("connecting");
   const [members, setMembers] = useState<RoomMember[]>([]);
   const [room, setRoom] = useState<RemoteRoom | null>(null);
+  const [error, setError] = useState<RemoteError | null>(null);
 
   const snapshotRef = useRef(getSnapshot);
   snapshotRef.current = getSnapshot;
@@ -43,10 +45,13 @@ export function useRemoteHost({
     let opened: RemoteRoom | null = null;
     const code = generateRoomCode();
     setRoomCode(code);
+    setStatus("connecting");
+    setError(null);
     openRemoteRoom(code, "host", {
       onCommand: (cmd) => commandRef.current(cmd),
       onMembers: setMembers,
       onConnectionState: setStatus,
+      onError: setError,
     }).then((r) => {
       if (cancelled) {
         r?.close();
@@ -84,5 +89,5 @@ export function useRemoteHost({
     }
   });
 
-  return { panelOpen, setPanelOpen, roomCode, status, members };
+  return { panelOpen, setPanelOpen, roomCode, status, members, error };
 }
