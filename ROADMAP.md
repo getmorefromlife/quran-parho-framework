@@ -23,6 +23,39 @@
 
 ---
 
+## Recently Completed
+
+### Fullscreen Timers + Custom Timer Durations (2026-08-06)
+
+Users can now present **just the timers** on a big fullscreen screen and set their own
+Session / Q&A / Turn lengths.
+
+- **Shared modules** (reused by both entry points, no duplicated timer logic):
+  - `src/lib/timer-durations.ts` — `TimerDurations { session, qa, turn }` (minutes), presets
+    (`SESSION [30,45,60,90]`, `QA [2,5,10,15]`, `TURN [3,5,10]`), load/save via
+    `localStorage` key `qp_timer_durations`, `toSeconds()`.
+  - `src/lib/timer-beep.ts` — shared `playAlertBeep()` (moved out of presentation-mode) +
+    `playWarningBeep()`.
+  - `src/hooks/use-countdown-timer.ts` — `{ seconds, total, active, start, pause, toggle,
+    reset, setDuration }`; `setDuration` applies immediately when idle, on next reset when
+    running.
+  - `src/components/shared/big-timer-card.tsx` — presentational giant timer card
+    (huge `tabular-nums` digits, urgency/expired red styling, progress bar, play/pause +
+    reset, preset chips + custom minutes input).
+- **Quran presentation mode** (`presentation-mode.tsx`): Timer Dock totals/resets now use
+  the saved durations; new **"Timer Durations"** section in the More Controls popover;
+  new **Timers Only** top-bar toggle (Presentation icon) that swaps the Quran stage for the
+  same two big timers (Session + Q&A) reusing live timer state. Durations persist across
+  visits.
+- **Practical Tools** (`facilitator-tools/index.tsx`): new prominent **"Launch Fullscreen
+  Timers"** button above the tab grid opens `timers-screen.tsx` — a fullscreen Session +
+  Q&A projection (dark, gold-accented) with beep mute, fullscreen toggle, Esc to close,
+  and expiry + 1-minute warning beeps. Shares the same duration storage as presentation mode.
+
+---
+
+
+
 ## Existing Sections (in page order)
 
 | Anchor | Component | Nav Key |

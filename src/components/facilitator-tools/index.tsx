@@ -1,10 +1,11 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import {
   CalendarDays,
   Calculator,
   LayoutDashboard,
   Layers,
   MessageCircle,
+  MonitorUp,
   Sparkles,
   Timer,
   Users,
@@ -27,6 +28,7 @@ const CalendarGenerator = lazy(() =>
 const FacilitatorDashboard = lazy(() =>
   import("./dashboard").then((m) => ({ default: m.FacilitatorDashboard })),
 );
+const TimersScreen = lazy(() => import("./timers-screen"));
 
 export function FacilitatorTools({
   lang,
@@ -40,6 +42,7 @@ export function FacilitatorTools({
   initialSplit?: { reading: number; discussion: number } | null;
 }) {
   const { tr } = useLang();
+  const [showTimersScreen, setShowTimersScreen] = useState(false);
   const tabs = [
     { label: lang === "en" ? "Session Timer" : "نشست کا ٹائمر", icon: Timer },
     { label: lang === "en" ? "Round-Robin" : "باری ٹریکر", icon: Users },
@@ -68,6 +71,22 @@ export function FacilitatorTools({
             {lang === "en"
               ? "Free, browser-based tools to run your Qurʼān Parho session smoothly."
               : "قرآن پڑھو نشست کو منظم کرنے کے لیے مفت، براؤزر پر چلنے والے ٹولز"}
+          </p>
+        </div>
+
+        {/* Launch Fullscreen Timers */}
+        <div className="mt-8 sm:mt-10 flex flex-col items-center gap-2.5">
+          <button
+            onClick={() => setShowTimersScreen(true)}
+            className="inline-flex items-center gap-2.5 px-6 sm:px-7 py-3.5 sm:py-3 rounded-2xl bg-emerald-gradient text-gold border border-gold/50 shadow-gold text-sm sm:text-base font-bold transition-transform hover:scale-[1.02] cursor-pointer"
+          >
+            <MonitorUp className="h-5 w-5 shrink-0" />
+            <span>{lang === "en" ? "Launch Fullscreen Timers" : "فل اسکرین ٹائمرز شروع کریں"}</span>
+          </button>
+          <p className="text-xs sm:text-sm text-muted-foreground text-center max-w-md">
+            {lang === "en"
+              ? "Present just the Session & Q&A timers on a big fullscreen screen — ideal when reading from a physical Qurʼān."
+              : "صرف سیشن اور سوال و جواب کے ٹائمر بڑی فل اسکرین پر دکھائیں — فزیکل قرآن پڑھتے وقت بہترین۔"}
           </p>
         </div>
 
@@ -112,6 +131,18 @@ export function FacilitatorTools({
           </Suspense>
         </div>
       </div>
+
+      {showTimersScreen && (
+        <Suspense
+          fallback={
+            <div className="fixed inset-0 z-[120] grid place-items-center bg-zinc-950 text-sm text-zinc-400">
+              {lang === "en" ? "Loading…" : "لوڈ ہو رہا ہے…"}
+            </div>
+          }
+        >
+          <TimersScreen lang={lang} onClose={() => setShowTimersScreen(false)} />
+        </Suspense>
+      )}
     </section>
   );
 }
