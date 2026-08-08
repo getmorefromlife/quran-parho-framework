@@ -1336,6 +1336,7 @@ export function SurahReader({
                 onClick={() => {
                   setSearchAllSurahs(false);
                 }}
+                aria-pressed={!searchAllSurahs}
                 className={cn(
                   "px-3 py-1 rounded-full text-xs font-semibold border transition-all",
                   !searchAllSurahs
@@ -1350,6 +1351,7 @@ export function SurahReader({
                 onClick={() => {
                   setSearchAllSurahs(true);
                 }}
+                aria-pressed={searchAllSurahs}
                 className={cn(
                   "px-3 py-1 rounded-full text-xs font-semibold border transition-all",
                   searchAllSurahs
@@ -1362,6 +1364,7 @@ export function SurahReader({
               <button
                 type="button"
                 onClick={() => setSearchScope("all")}
+                aria-pressed={searchScope === "all"}
                 className={cn(
                   "px-3 py-1 rounded-full text-xs font-semibold border transition-all",
                   searchScope === "all"
@@ -1374,6 +1377,7 @@ export function SurahReader({
               <button
                 type="button"
                 onClick={() => setSearchScope("selected")}
+                aria-pressed={searchScope === "selected"}
                 className={cn(
                   "px-3 py-1 rounded-full text-xs font-semibold border transition-all",
                   searchScope === "selected"
@@ -1386,6 +1390,7 @@ export function SurahReader({
               <button
                 type="button"
                 onClick={() => setSearchMode("contains")}
+                aria-pressed={searchMode === "contains"}
                 className={cn(
                   "px-3 py-1 rounded-full text-xs font-semibold border transition-all",
                   searchMode === "contains"
@@ -1398,6 +1403,7 @@ export function SurahReader({
               <button
                 type="button"
                 onClick={() => setSearchMode("word")}
+                aria-pressed={searchMode === "word"}
                 className={cn(
                   "px-3 py-1 rounded-full text-xs font-semibold border transition-all",
                   searchMode === "word"
