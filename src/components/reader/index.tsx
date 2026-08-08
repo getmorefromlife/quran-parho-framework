@@ -63,7 +63,13 @@ import {
   type ReaderPrefs,
 } from "@/lib/reader-fonts";
 import { verseAudioUrl, loadReciter, saveReciter, type ReciterId } from "@/lib/audio-reciters";
-import { saveSelectedTranslations, getTranslationText, getTranslation } from "@/lib/translations";
+import {
+  saveSelectedTranslations,
+  getTranslationText,
+  getTranslation,
+  getFieldForId,
+} from "@/lib/translations";
+import { normalizeQuery, searchVerse, SEARCH_RESULT_CAP, type SearchMode } from "@/lib/search";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,6 +79,7 @@ import {
 import { FloatingSettings, ReaderSettingsPanel } from "@/components/reader/settings-panel";
 import { CircleTurnBar } from "@/components/reader/circle-turn-bar";
 import { ThemePlaylistBar } from "@/components/reader/theme-playlist-bar";
+import { Highlight } from "@/components/reader/highlight";
 import { HifzControls } from "@/components/reader/hifz-controls";
 import { PresentationMode } from "@/components/reader/presentation-mode";
 import { loadHifzPrefs, saveHifzPrefs, type HifzPrefs } from "@/lib/hifz-settings";
@@ -152,9 +159,10 @@ export function SurahReader({
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchAllSurahs, setSearchAllSurahs] = useState(false);
-  const [searchResults, setSearchResults] = useState<
-    { surah: number; ayah: number; arabic: string; english_qarai: string; urdu_jawadi: string }[]
-  >([]);
+  const [searchScope, setSearchScope] = useState<"all" | "selected">("all");
+  const [searchMode, setSearchMode] = useState<SearchMode>("contains");
+  const [showAllResults, setShowAllResults] = useState(false);
+  const [searchResults, setSearchResults] = useState<QVerse[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchSavedToast, setSearchSavedToast] = useState(false);
   const allSurahCache = useRef<Map<number, QVerse[]>>(new Map());
@@ -666,62 +674,68 @@ export function SurahReader({
   }, [showSavedPanel, savedTab, highlights, favorites, verseNotes]);
 
   // ── Search logic ──
+  const searchFields = useMemo(
+    () =>
+      searchScope === "selected"
+        ? selectedTrans.map((tid) => getFieldForId(tid)).filter((f): f is string => Boolean(f))
+        : undefined,
+    [searchScope, selectedTrans],
+  );
   useEffect(() => {
     if (!showSearch || !searchQuery.trim()) {
       setSearchResults([]);
       return;
     }
-    const q = searchQuery.trim().toLowerCase();
+    const qn = normalizeQuery(searchQuery);
+    if (!qn) {
+      setSearchResults([]);
+      return;
+    }
+    setShowAllResults(false);
     let cancelled = false;
 
     const match = (arr: QVerse[]) =>
-      arr.filter((v) => {
-        if (v.arabic.includes(searchQuery.trim())) return true;
-        if (v.english_qarai.toLowerCase().includes(q)) return true;
-        if (v.urdu_jawadi.includes(searchQuery.trim())) return true;
-        for (const tid of selectedTrans) {
-          const text = getTranslationText(v as Record<string, unknown>, tid);
-          if (text && text.toLowerCase().includes(q)) return true;
-        }
-        return false;
-      });
+      arr.filter((v) => searchVerse(v, qn, searchMode, searchFields));
 
     if (!searchAllSurahs) {
-      if (verses) setSearchResults(match(verses));
+      setSearchResults(verses ? match(verses) : []);
       return;
     }
 
-    // Full Qur'an search — lazy-load all surahs
+    // Full Qur'an search — debounce, then lazy-load all surahs
     setSearchLoading(true);
     setSearchResults([]);
-    const loadAll = async () => {
-      for (let n = 1; n <= 114; n++) {
-        if (cancelled) return;
-        if (!allSurahCache.current.has(n)) {
-          try {
-            const res = await fetch(`/quran/surah-${n}.json`);
-            if (res.ok) {
-              const data = (await res.json()) as QVerse[];
-              allSurahCache.current.set(n, data);
+    const timer = setTimeout(() => {
+      const loadAll = async () => {
+        for (let n = 1; n <= 114; n++) {
+          if (cancelled) return;
+          if (!allSurahCache.current.has(n)) {
+            try {
+              const res = await fetch(`/quran/surah-${n}.json`);
+              if (res.ok) {
+                const data = (await res.json()) as QVerse[];
+                allSurahCache.current.set(n, data);
+              }
+            } catch {
+              /* skip */
             }
-          } catch {
-            /* skip */
+          }
+          // Search after each batch of 10 surahs for incremental results
+          if (n % 10 === 0 || n === 114) {
+            if (cancelled) return;
+            const all = Array.from(allSurahCache.current.values()).flat();
+            setSearchResults(match(all));
           }
         }
-        // Search after each batch of 10 surahs for incremental results
-        if (n % 10 === 0 || n === 114) {
-          if (cancelled) return;
-          const all = Array.from(allSurahCache.current.values()).flat();
-          setSearchResults(match(all));
-        }
-      }
-      if (!cancelled) setSearchLoading(false);
-    };
-    loadAll();
+        if (!cancelled) setSearchLoading(false);
+      };
+      loadAll();
+    }, 300);
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
-  }, [showSearch, searchQuery, searchAllSurahs, verses, surahN, selectedTrans]);
+  }, [showSearch, searchQuery, searchAllSurahs, searchMode, searchFields, verses, surahN]);
 
   return (
     <div
@@ -1339,6 +1353,54 @@ export function SurahReader({
               >
                 {lang === "en" ? "All surahs" : "تمام سورتیں"}
               </button>
+              <button
+                type="button"
+                onClick={() => setSearchScope("all")}
+                className={cn(
+                  "px-3 py-1 rounded-full text-xs font-semibold border transition-all",
+                  searchScope === "all"
+                    ? "bg-gold/10 border-gold/40 text-gold"
+                    : "border-border text-muted-foreground hover:border-gold/40",
+                )}
+              >
+                {tr("search_all_translations")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSearchScope("selected")}
+                className={cn(
+                  "px-3 py-1 rounded-full text-xs font-semibold border transition-all",
+                  searchScope === "selected"
+                    ? "bg-gold/10 border-gold/40 text-gold"
+                    : "border-border text-muted-foreground hover:border-gold/40",
+                )}
+              >
+                {tr("search_selected_only")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSearchMode("contains")}
+                className={cn(
+                  "px-3 py-1 rounded-full text-xs font-semibold border transition-all",
+                  searchMode === "contains"
+                    ? "bg-gold/10 border-gold/40 text-gold"
+                    : "border-border text-muted-foreground hover:border-gold/40",
+                )}
+              >
+                {tr("search_contains")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSearchMode("word")}
+                className={cn(
+                  "px-3 py-1 rounded-full text-xs font-semibold border transition-all",
+                  searchMode === "word"
+                    ? "bg-gold/10 border-gold/40 text-gold"
+                    : "border-border text-muted-foreground hover:border-gold/40",
+                )}
+              >
+                {tr("search_exact_word")}
+              </button>
               {searchQuery.trim() && (
                 <button
                   type="button"
@@ -1362,8 +1424,21 @@ export function SurahReader({
               )}
               {searchResults.length > 0 && (
                 <span className="ml-auto text-xs text-muted-foreground">
-                  {searchResults.length} {lang === "en" ? "results" : "نتائج"}
+                  {searchResults.length > SEARCH_RESULT_CAP && !showAllResults
+                    ? tr("search_showing_of")
+                        .replace("{shown}", String(SEARCH_RESULT_CAP))
+                        .replace("{total}", String(searchResults.length))
+                    : `${searchResults.length} ${lang === "en" ? "results" : "نتائج"}`}
                 </span>
+              )}
+              {searchResults.length > SEARCH_RESULT_CAP && !showAllResults && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllResults(true)}
+                  className="px-3 py-1 rounded-full text-xs font-semibold border border-gold/40 bg-gold/10 text-gold hover:bg-gold/20 transition-all"
+                >
+                  {tr("search_show_all")}
+                </button>
               )}
             </div>
           </div>
@@ -1382,104 +1457,109 @@ export function SurahReader({
               {lang === "en" ? "No results found" : "کوئی نتائج نہیں ملے"}
             </p>
           ) : (
-            searchResults.map((r) => {
-              const s = SURAHS.find((x) => x.n === r.surah);
-              return (
-                <div
-                  key={`${r.surah}:${r.ayah}`}
-                  onClick={() => {
-                    if (r.surah === surahN) {
-                      const node = verseRefs.current.get(r.ayah);
-                      if (node && scrollRef.current) {
-                        const top =
-                          node.getBoundingClientRect().top + scrollRef.current.scrollTop - 90;
-                        scrollRef.current.scrollTo({ top, behavior: "smooth" });
-                        setFlash(r.ayah);
-                        setSelectedVerse(r.ayah);
-                        setTimeout(() => setFlash(null), 3000);
+            searchResults
+              .slice(0, showAllResults ? searchResults.length : SEARCH_RESULT_CAP)
+              .map((r) => {
+                const s = SURAHS.find((x) => x.n === r.surah);
+                return (
+                  <div
+                    key={`${r.surah}:${r.ayah}`}
+                    onClick={() => {
+                      if (r.surah === surahN) {
+                        const node = verseRefs.current.get(r.ayah);
+                        if (node && scrollRef.current) {
+                          const top =
+                            node.getBoundingClientRect().top + scrollRef.current.scrollTop - 90;
+                          scrollRef.current.scrollTo({ top, behavior: "smooth" });
+                          setFlash(r.ayah);
+                          setSelectedVerse(r.ayah);
+                          setTimeout(() => setFlash(null), 3000);
+                        }
+                      } else {
+                        onNavigate(r.surah, r.ayah);
                       }
-                    } else {
-                      onNavigate(r.surah, r.ayah);
-                    }
-                    setShowSearch(false);
-                    setSearchQuery("");
-                    setSearchResults([]);
-                  }}
-                  className="rounded-xl border border-border bg-card p-4 hover:border-gold/40 cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-gold">
-                      {s?.en ?? `Surah ${r.surah}`} · {r.surah}:{r.ayah}
-                    </span>
-                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const text = composeShareText(
-                            r,
-                            s?.en ?? "",
-                            s?.ar ?? "",
-                            verseNotes[`${r.surah}:${r.ayah}`],
-                            sharePrefs,
-                            selectedTrans,
-                          );
-                          navigator.clipboard.writeText(text).then(() => {
-                            setCopiedToast(true);
-                            setTimeout(() => setCopiedToast(false), 1500);
-                          });
-                        }}
-                        className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-gold/40 transition-colors"
-                        title="Copy"
-                      >
-                        <Copy className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const text = composeShareText(
-                            r,
-                            s?.en ?? "",
-                            s?.ar ?? "",
-                            verseNotes[`${r.surah}:${r.ayah}`],
-                            sharePrefs,
-                            selectedTrans,
-                          );
-                          window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
-                        }}
-                        className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-gold/40 transition-colors"
-                        title="WhatsApp"
-                      >
-                        <MessageCircle className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                  <p
-                    dir="rtl"
-                    className="text-right text-lg text-foreground leading-relaxed"
-                    style={{ fontFamily: arFam }}
+                      setShowSearch(false);
+                      setSearchQuery("");
+                      setSearchResults([]);
+                    }}
+                    className="rounded-xl border border-border bg-card p-4 hover:border-gold/40 cursor-pointer transition-colors"
                   >
-                    {r.arabic}
-                  </p>
-                  {selectedTrans.slice(0, 2).map((tid) => {
-                    const text = getTranslationText(r as Record<string, unknown>, tid);
-                    const tDef = getTranslation(tid);
-                    if (!text || !tDef) return null;
-                    return (
-                      <p
-                        key={tid}
-                        dir={tDef.dir}
-                        className={cn(
-                          "text-sm text-muted-foreground mt-1 leading-relaxed",
-                          tDef.dir === "rtl" && "text-right",
-                        )}
-                      >
-                        {text}
-                      </p>
-                    );
-                  })}
-                </div>
-              );
-            })
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-gold">
+                        {s?.en ?? `Surah ${r.surah}`} · {r.surah}:{r.ayah}
+                      </span>
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const text = composeShareText(
+                              r,
+                              s?.en ?? "",
+                              s?.ar ?? "",
+                              verseNotes[`${r.surah}:${r.ayah}`],
+                              sharePrefs,
+                              selectedTrans,
+                            );
+                            navigator.clipboard.writeText(text).then(() => {
+                              setCopiedToast(true);
+                              setTimeout(() => setCopiedToast(false), 1500);
+                            });
+                          }}
+                          className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-gold/40 transition-colors"
+                          title="Copy"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const text = composeShareText(
+                              r,
+                              s?.en ?? "",
+                              s?.ar ?? "",
+                              verseNotes[`${r.surah}:${r.ayah}`],
+                              sharePrefs,
+                              selectedTrans,
+                            );
+                            window.open(
+                              `https://wa.me/?text=${encodeURIComponent(text)}`,
+                              "_blank",
+                            );
+                          }}
+                          className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-gold/40 transition-colors"
+                          title="WhatsApp"
+                        >
+                          <MessageCircle className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                    <p
+                      dir="rtl"
+                      className="text-right text-lg text-foreground leading-relaxed"
+                      style={{ fontFamily: arFam }}
+                    >
+                      <Highlight text={r.arabic} query={searchQuery} mode={searchMode} />
+                    </p>
+                    {selectedTrans.slice(0, 2).map((tid) => {
+                      const text = getTranslationText(r as Record<string, unknown>, tid);
+                      const tDef = getTranslation(tid);
+                      if (!text || !tDef) return null;
+                      return (
+                        <p
+                          key={tid}
+                          dir={tDef.dir}
+                          className={cn(
+                            "text-sm text-muted-foreground mt-1 leading-relaxed",
+                            tDef.dir === "rtl" && "text-right",
+                          )}
+                        >
+                          <Highlight text={text} query={searchQuery} mode={searchMode} />
+                        </p>
+                      );
+                    })}
+                  </div>
+                );
+              })
           )}
         </div>
       )}
