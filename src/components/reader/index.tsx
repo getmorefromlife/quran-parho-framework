@@ -707,25 +707,31 @@ export function SurahReader({
     setSearchResults([]);
     const timer = setTimeout(() => {
       const loadAll = async () => {
-        for (let n = 1; n <= 114; n++) {
+        for (let n = 1; n <= 114; n += 10) {
           if (cancelled) return;
-          if (!allSurahCache.current.has(n)) {
-            try {
-              const res = await fetch(`/quran/surah-${n}.json`);
-              if (res.ok) {
-                const data = (await res.json()) as QVerse[];
-                allSurahCache.current.set(n, data);
+          // Load a batch of 10 surahs in parallel
+          const last = Math.min(n + 9, 114);
+          await Promise.all(
+            Array.from({ length: last - n + 1 }, async (_, i) => {
+              const sn = n + i;
+              if (allSurahCache.current.has(sn)) return;
+              try {
+                const res = await fetch(`/quran/surah-${sn}.json`, {
+                  signal: AbortSignal.timeout(15000),
+                });
+                if (res.ok) {
+                  const data = (await res.json()) as QVerse[];
+                  allSurahCache.current.set(sn, data);
+                }
+              } catch {
+                /* skip */
               }
-            } catch {
-              /* skip */
-            }
-          }
+            }),
+          );
+          if (cancelled) return;
           // Search after each batch of 10 surahs for incremental results
-          if (n % 10 === 0 || n === 114) {
-            if (cancelled) return;
-            const all = Array.from(allSurahCache.current.values()).flat();
-            setSearchResults(match(all));
-          }
+          const all = Array.from(allSurahCache.current.values()).flat();
+          setSearchResults(match(all));
         }
         if (!cancelled) setSearchLoading(false);
       };
@@ -1448,14 +1454,16 @@ export function SurahReader({
       {/* ── Search results ── */}
       {showSearch && searchQuery.trim() && (
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-3">
-          {searchLoading ? (
-            <p className="text-center text-muted-foreground py-8">
-              {lang === "en" ? "Loading all surahs..." : "تمام سورتیں لوڈ ہو رہی ہیں..."}
-            </p>
-          ) : searchResults.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">
-              {lang === "en" ? "No results found" : "کوئی نتائج نہیں ملے"}
-            </p>
+          {searchResults.length === 0 ? (
+            searchLoading ? (
+              <p className="text-center text-muted-foreground py-8">
+                {lang === "en" ? "Loading all surahs..." : "تمام سورتیں لوڈ ہو رہی ہیں..."}
+              </p>
+            ) : (
+              <p className="text-center text-muted-foreground py-8">
+                {lang === "en" ? "No results found" : "کوئی نتائج نہیں ملے"}
+              </p>
+            )
           ) : (
             searchResults
               .slice(0, showAllResults ? searchResults.length : SEARCH_RESULT_CAP)
